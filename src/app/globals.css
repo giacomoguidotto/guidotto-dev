@@ -74,20 +74,23 @@ body {
   pointer-events: auto;
 }
 
-/* signature-scale avatar slot (empty until the portrait lands; the monogram is a
-   name-derived placeholder) */
+/* signature-scale avatar */
 .masthead__avatar {
-  display: grid;
-  place-items: center;
+  position: relative;
+  display: block;
   width: 2rem;
   height: 2rem;
-  font-family: var(--font-mono), monospace;
-  font-size: 0.6rem;
-  color: color-mix(in oklch, var(--ivory) 68%, transparent);
-  letter-spacing: 0.04em;
+  overflow: hidden;
   background: color-mix(in oklch, var(--ivory) 6%, transparent);
-  border: 1px solid color-mix(in oklch, var(--ivory) 16%, transparent);
+  border: 1px solid color-mix(in oklch, var(--ivory) 18%, transparent);
   border-radius: 50%;
+}
+
+.masthead__avatar-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .masthead__wordmark {
