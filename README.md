@@ -5,68 +5,80 @@
 <h1 align="center">guidotto.dev</h1>
 
 <p align="center">
-  <strong>Public portfolio for a backend-focused engineer building toward AI-native product and systems work.</strong><br>
-  <sub>Next.js 16 &middot; Tailwind CSS 4 &middot; Bun &middot; Notion-backed source material</sub>
+  <strong>A physics library. A map for tangled systems. Two productivity apps. A love letter.</strong><br>
+  <sub>My portfolio &middot; Next.js 16 &middot; Tailwind CSS 4 &middot; Bun</sub>
 </p>
 
 <p align="center">
-  <a href="https://github.com/giacomoguidotto/guidotto-dev/actions"><img src="https://github.com/giacomoguidotto/guidotto-dev/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/giacomoguidotto/guidotto-dev/blob/main/LICENSE"><img src="https://img.shields.io/github/license/giacomoguidotto/guidotto-dev" alt="License"></a>
+  <a href="https://github.com/giacomoguidotto/guidotto.dev/actions"><img src="https://github.com/giacomoguidotto/guidotto.dev/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/giacomoguidotto/guidotto.dev/blob/main/LICENSE"><img src="https://img.shields.io/github/license/giacomoguidotto/guidotto.dev" alt="License"></a>
 </p>
 
 <br>
 
-guidotto.dev is the public website for Giacomo Guidotto. It is being shaped from public-safe profile and project facts, while Notion remains the canonical source of truth.
+Most portfolios ask you to believe a sentence. I built `guidotto.dev` to let the work do the arguing.
 
-This repo owns the Next.js implementation, local validation, and reviewable exported source material. It should not become a duplicate knowledge base.
+It opens like a vitrine. The work sits under glass, a thesis line floats over it, and as you scroll the proof resolves from atmosphere into evidence. One viewport to feel the range, the rest of the page to verify it. No pitch you have to take on faith.
 
-## What Is Here
+> A physics library. A map for tangled systems. Two productivity apps. A love letter.
 
-- `src/app/`: the public website surface.
-- `public/`: static assets used by the site.
-- `.github/`: contribution, issue, pull request, security, ownership, and CI files.
-- `docs/agents/`: repo-local navigation for agent workflows.
+That sentence is the whole site in one breath. Each piece is a different platform, a different language, a different reason to exist. The variety is the point: backend systems, native apps, shipped product, ML research, all from the same hands. Chasing ideas to make an impact, and shipping them.
 
-## Source Material
+<p align="center">
+  <a href="https://guidotto.dev"><strong>Visit the site &rarr;</strong></a>
+</p>
 
-Notion owns the canonical profile, portfolio, project, task, and personal context. When profile, project, or positioning facts might have changed, use a narrow live Notion lookup before changing public content.
+## What's under the glass
 
-Do not commit raw personal information dumps or broad Notion exports to this repo.
+Selected work, each a different world:
 
-## Local Development
+- **Orray** &middot; `Platform · Go · Kubernetes` <br>
+  A new way to navigate your system. Infrastructure you can finally see: a Go control plane and Kubernetes CRDs sit under a living canvas, so a cluster becomes a place you move through instead of a wall of dashboards. Still in early development.
 
-Install dependencies:
+- **Tempo** &middot; `Product · Android · Expo` <br>
+  Find your rhythm during the day. An open-source app that nudges you toward what matters through the day, then shows you how well you kept to it. Soon on the Play Store.
 
-```sh
-bun install
-```
+- **Scry** &middot; `Product · macOS · Swift` <br>
+  Circle to Search for macOS. A native Swift app that talks straight to macOS: global hotkeys, screen capture, Vision OCR, a floating answer panel, and Sparkle auto-updates. Installable today.
 
-Start the development server:
+- **Ginevra Renier** &middot; `Product · Next.js · Convex` <br>
+  The home for my love's photography. For her, the site becomes a canvas she can edit in real time. No friction between her and her work. My way of showing love through code.
 
-```sh
-bun run dev
-```
+## The centerpiece
 
-Run the canonical local validation command:
+**AnyPINN.** As order rises from chaos.
 
-```sh
-bun run ci
-```
+My machine learning library, running live in your browser. 300 real points, three little networks, and a neural net finding the law behind the noise. Open-source physics-informed neural networks, grown from a funded thesis, with public docs, CI, PyPI packaging, and a JOSS submission behind it.
 
-CI mirrors this command.
+## Where this is heading
 
-## Tooling
+To keep improving.
+
+Software engineer at Danfoss since 2022, promoted from junior in two years. I kept pushing into new territory: frontend delivery, backend ownership, data pipelines, energy optimization, integration work. Now I'm building a Rust-based MQTT ingestion pipeline for datacenter cooling diagnostics, on a Kubernetes-hosted IoT platform large enough to matter for reliability.
+
+Outside work too, I chase the harder, broader problems and shape them into products that improve people's lives.
+
+> I'm Jack. Forever curious, always improving, never quite comfortable, and building something that matters.
+
+## How it's built
+
+The implementation is meant to stay quiet so the work stays loud. The hero is lightweight and reactive, so first paint is instant and the headline is the first thing you read. The single heavy interactive moment is saved for the centerpiece, where AnyPINN goes genuinely live. Everything else earns its color through attention.
 
 | Tool | Purpose |
 | --- | --- |
-| [Bun](https://bun.sh) | Runtime and package manager |
-| [mise](https://mise.jdx.dev) | Optional local tool provisioning |
-| [Next.js](https://nextjs.org) | App Router site framework |
-| [Tailwind CSS](https://tailwindcss.com) | Styling |
-| [Biome](https://biomejs.dev) / [Ultracite](https://www.ultracite.ai) | Linting and formatting |
+| [Next.js](https://nextjs.org) | Static-first App Router site |
+| [Tailwind CSS](https://tailwindcss.com) | Visual system and interaction styling |
+| [Bun](https://bun.sh) | Runtime, package manager, and CI entrypoint |
+| [Biome](https://biomejs.dev) / [Ultracite](https://www.ultracite.ai) | Formatting and code quality |
+
+```bash
+bun install      # install dependencies
+bun run dev      # start the dev server
+bun run ci       # the canonical validation: lint, typecheck, build
+```
 
 ## Contributing
 
-Free and open source under the [MIT License](LICENSE). See [CONTRIBUTING.md](.github/CONTRIBUTING.md) to get involved.
+Free and open source under the [MIT License](LICENSE). See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidelines. Contributions are welcome where they improve implementation quality, accessibility, performance, or documentation without weakening the public-safe source boundary.
 
 Agents should start at [AGENTS.md](AGENTS.md).
