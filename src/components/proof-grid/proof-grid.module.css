@@ -1,0 +1,335 @@
+/* Proof grid — the 2x2 of recording-forward peer cards.
+
+   Co-located module CSS, kept OUT of globals.css so this Wave-1 slice owns its
+   own surface and never merge-conflicts with the parallel hero slice. It only
+   READS the global design tokens (the glass tokens --glass-rim / --glass-gloss /
+   --glass-specular / --glass-inner-shadow, the stage tokens --stage-*, the warm
+   --ivory, and the earned-color --accent / --live-accent); it never edits them.
+
+   The glass framing here replicates GlassVessel's layers (rim light, gloss
+   sweep, specular, inner shadow) rather than composing it, because a proof card
+   must be a navigating <a href={repoUrl}>, not GlassVessel's <button>. Each card
+   blooms its own --accent on hover / focus / touch, and only one card is loud at
+   a time: the :hover / :focus-visible card here, reinforced by the single-root
+   --live-accent the ShowcaseRoot writes (one property, one lead). */
+
+/* the stage used by the standalone preview route (mirrors the hero field, but
+   grows with content instead of clipping to one viewport) */
+.stage {
+  position: relative;
+  z-index: 0;
+  width: 100%;
+  min-height: 100svh;
+  color: var(--ivory);
+  background: radial-gradient(
+    130% 105% at 50% 16%,
+    var(--stage-1) 0%,
+    var(--stage-2) 52%,
+    var(--stage-3) 100%
+  );
+  isolation: isolate;
+}
+
+/* the stage tint rides the focused card's accent (earned color) */
+.tint {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 95% at 50% 38%,
+    color-mix(in oklch, var(--live-accent, transparent) 26%, transparent) 0%,
+    transparent 58%
+  );
+  transition: background 0.7s ease;
+}
+
+.section {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: clamp(2.5rem, 6vw, 5rem) clamp(1.2rem, 4vw, 3rem);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1.75rem, 4vw, 3.25rem);
+  width: min(100%, 70rem);
+  padding: 0;
+  margin: 0 auto;
+  list-style: none;
+}
+
+/* one column when there isn't room for the 2x2 */
+@media (max-width: 40rem) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.item {
+  display: block;
+}
+
+/* the whole card is the link: it navigates to the repo AND is the focus/hover/
+   touch target that drives the earned accent */
+.card {
+  --c: var(--accent, var(--ivory));
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  height: 100%;
+  color: var(--ivory);
+  text-decoration: none;
+  outline: none;
+  border-radius: 1.4rem;
+}
+
+.card:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--c) 75%, transparent);
+  outline-offset: 6px;
+}
+
+/* ---- the work under glass ---- */
+
+.vessel {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 1.4rem;
+  /* gentle lift on focus; no parallax, no float, no depth blur at rest */
+  transform: translate3d(0, 0, 0) scale(1);
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.card:hover .vessel,
+.card:focus-visible .vessel {
+  transform: translate3d(0, 0, 0) scale(1.015);
+}
+
+/* clipped surface so the gloss sweep can't bleed past the rounded corners */
+.surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  box-shadow: 0 30px 70px -28px oklch(0 0 0 / 0.85);
+  transition: box-shadow 0.5s ease;
+}
+
+.card:hover .surface,
+.card:focus-visible .surface {
+  box-shadow: 0 26px 80px -18px color-mix(in oklch, var(--c) 55%, transparent);
+}
+
+/* the media is ProjectMedia's motif (the intentional placeholder behind the
+   media seam). Sharp at rest (NO blur) but a touch calmer; on focus it
+   saturates / brightens (the "sharpen / play" read, done as a visual treatment
+   since real recordings are pending owner assets). The filter rides this local
+   wrapper so we never reach into ProjectMedia's own class names. */
+.media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  filter: saturate(0.82) brightness(0.95);
+  transition: filter 0.55s ease;
+}
+
+.card:hover .media,
+.card:focus-visible .media {
+  filter: saturate(1.05) brightness(1.05);
+}
+
+/* the accent bloom — a screened wash of the project accent that surfaces over
+   the media on focus (the "accent blooms, saturated on cards" beat) */
+.bloom {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 110% at 50% 30%,
+    color-mix(in oklch, var(--c) 42%, transparent) 0%,
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.card:hover .bloom,
+.card:focus-visible .bloom {
+  opacity: 0.85;
+}
+
+/* the glass: rim light, top gloss, specular, inner shadow (token-driven) —
+   a frame, never a lens that distorts the work beneath it */
+.glass {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(150deg, var(--glass-rim) 0%, transparent 32%),
+    radial-gradient(120% 80% at 28% 12%, var(--glass-gloss) 0%, transparent 46%);
+  border: 1px solid color-mix(in oklch, white 15%, transparent);
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 1px var(--glass-specular),
+    inset 0 -34px 60px var(--glass-inner-shadow);
+  transition:
+    border-color 0.5s ease,
+    box-shadow 0.5s ease;
+}
+
+.card:hover .glass,
+.card:focus-visible .glass {
+  border-color: color-mix(in oklch, var(--c) 70%, transparent);
+  box-shadow:
+    inset 0 1px 1px color-mix(in oklch, var(--glass-specular) 80%, white),
+    inset 0 -28px 56px var(--glass-inner-shadow),
+    inset 0 0 30px -6px color-mix(in oklch, var(--c) 55%, transparent);
+}
+
+/* gloss sweep on focus — the glass tell (clipped by the surface) */
+.sweep {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    var(--glass-gloss) 50%,
+    transparent 62%
+  );
+  transform: translateX(-130%);
+  transition: transform 0.9s ease;
+}
+
+.card:hover .sweep,
+.card:focus-visible .sweep {
+  transform: translateX(130%);
+}
+
+/* ---- the earned caption ---- */
+
+.caption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0 0.2rem;
+}
+
+.title {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.45rem;
+  font-weight: 400;
+  line-height: 1.1;
+  color: color-mix(in oklch, var(--c) 24%, var(--ivory));
+  transition: color 0.5s ease;
+}
+
+/* the one weighted at-rest line */
+.atRest {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.02rem;
+  line-height: 1.35;
+  color: color-mix(in oklch, var(--ivory) 88%, transparent);
+}
+
+/* the small mono domain · stack tag */
+.tag {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.62rem;
+  color: color-mix(in oklch, var(--c) 70%, var(--ivory));
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  transition: color 0.5s ease;
+}
+
+/* on-focus reveal: the bigger-picture copy + the single proof badge slot.
+   Collapsed at rest with the 0fr -> 1fr grid-row trick (animatable height,
+   zero layout cost at rest). */
+.onFocusWrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.5s ease;
+}
+
+.card:hover .onFocusWrap,
+.card:focus-visible .onFocusWrap {
+  grid-template-rows: 1fr;
+}
+
+.onFocus {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  overflow: hidden;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: color-mix(in oklch, var(--ivory) 78%, transparent);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.card:hover .onFocus,
+.card:focus-visible .onFocus {
+  opacity: 1;
+}
+
+/* the single proof badge — at most one, and dark until a real KPI is sourced
+   into the content surface (copy.md: "No badges"; CONTEXT: badges stay dark
+   until real KPIs; never invented). The slot renders only when a badge is
+   passed, so the one-badge cap is structural. */
+.badge {
+  align-self: flex-start;
+  padding: 0.3rem 0.65rem;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6rem;
+  color: var(--c);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  border: 1px solid color-mix(in oklch, var(--c) 50%, transparent);
+  border-radius: 999px;
+}
+
+/* reduced motion: collapse to a static, fully legible card (poster only, no
+   sweep, no scale) with the at-rest line, tag, and on-focus copy all shown */
+@media (prefers-reduced-motion: reduce) {
+  .vessel,
+  .surface,
+  .media,
+  .bloom,
+  .glass,
+  .sweep,
+  .onFocusWrap,
+  .onFocus,
+  .title,
+  .tag,
+  .tint {
+    transition: none;
+  }
+
+  .card:hover .vessel,
+  .card:focus-visible .vessel {
+    transform: none;
+  }
+
+  .sweep {
+    display: none;
+  }
+
+  .onFocusWrap {
+    grid-template-rows: 1fr;
+  }
+
+  .onFocus {
+    opacity: 1;
+  }
+}
