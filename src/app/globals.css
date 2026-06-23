@@ -388,7 +388,8 @@ body {
   flex-direction: column;
   gap: 1.4rem;
   align-items: center;
-  width: min(92vw, 40ch);
+  /* runs wide on purpose: the thesis is allowed to spread over the vitrine */
+  width: min(94vw, 64rem);
   text-align: center;
   pointer-events: none;
   transform: translate(-50%, -50%);
@@ -425,7 +426,7 @@ body {
 
 .thesis {
   margin: 0;
-  font-size: clamp(2.4rem, 5.8vw, 5rem);
+  font-size: clamp(2.1rem, 4.8vw, 4.4rem);
   font-variation-settings:
     "opsz" 144,
     "SOFT" 40,
