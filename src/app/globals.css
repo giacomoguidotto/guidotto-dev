@@ -426,7 +426,7 @@ body {
 
 .thesis {
   margin: 0;
-  font-size: clamp(2.1rem, 4.8vw, 4.4rem);
+  font-size: clamp(1.9rem, 4.4vw, 4rem);
   font-variation-settings:
     "opsz" 144,
     "SOFT" 40,
@@ -435,13 +435,14 @@ body {
   /* a stanza of lines: let it breathe between them, slightly looser tracking */
   line-height: 1.22;
   letter-spacing: 0.01em;
-  text-wrap: balance;
   text-shadow: 0 2px 44px
     color-mix(in oklch, var(--stage-deep) 85%, transparent);
 }
 
 .thesis__line {
   display: block;
+  /* each line stays whole (no mid-line wrap); it may run over the vitrine */
+  white-space: nowrap;
 }
 
 .subline {
