@@ -1,25 +1,29 @@
 "use client";
 
-// ProofCard — one peer in the 2x2 proof grid: recording-forward with an earned
-// caption. The whole card is an <a> to the project's public GitHub repo, and it
-// is itself the focus / hover / touch target. At rest it shows the sharp work +
-// the one weighted line + a mono tag; when it is the grid's single active card
-// the media sharpens, the accent blooms, gloss sweeps, and the bigger-picture
-// copy surfaces with at most one proof badge.
+// ProofCard — one peer: recording-forward with an earned caption. The whole card
+// is an <a> to the project's public GitHub repo, and it is itself the focus /
+// hover / touch target. At rest it shows the sharp square work + the one weighted
+// line + a mono tag; when it is the grid's single active card the media sharpens,
+// the accent blooms, gloss sweeps, and the bigger-picture copy fades in (it is
+// always laid out, so the reveal causes no layout shift).
 //
 // An anchor (not GlassVessel's <button>) is used on purpose: the card's primary
-// job is to navigate to the repo. The loud state is driven by `isActive` (the
-// single-active-card coordinator in ProofGrid), never by this card's own :hover
-// / :focus-visible, so two cards can never answer loudly at once.
+// job is to navigate. The loud state is driven by `isActive` (the single-active-
+// card coordinator in ProofGrid), never by this card's own :hover / :focus-
+// visible, so two cards can never answer loudly at once.
 //
 // Input paths, all funnelled through the coordinator:
-//   - mouse (fine pointer): pointer-enter activates, pointer-leave releases,
-//     first click navigates;
-//   - keyboard: focus-visible activates, blur releases, Enter navigates;
-//   - touch (coarse pointer): the FIRST tap reveals + blooms without leaving for
-//     GitHub, a SECOND tap on the already-active card follows the link. Hover is
-//     ignored on coarse pointers, and keyboard / screen-reader activations
-//     (click detail === 0) are never gated, so they navigate on the first try.
+//   - desktop mouse (fine pointer, grid): pointer-enter activates, pointer-leave
+//     releases, first click navigates;
+//   - keyboard (either layout): focus-visible activates (and, in the carousel,
+//     centres the card), blur releases on desktop, Enter navigates;
+//   - mobile carousel (coarse / <= 40rem): the centred card is set by the
+//     coordinator's scroll observer; a tap on a NON-centred card brings it to
+//     centre + focuses it instead of leaving, a tap on the already-centred card
+//     follows the link. Hover never activates here, so scrolling can't light a
+//     card.
+//   - non-carousel coarse (e.g. a tablet on the grid): first tap reveals, second
+//     tap on the active card navigates.
 
 import {
   type CSSProperties,
@@ -34,9 +38,17 @@ import { useAccent } from "~/components/showcase/showcase-root";
 import type { Project } from "~/content";
 import styles from "./proof-grid.module.css";
 
+// Bring a card to the centre of its scroll container (the carousel), honouring
+// reduced-motion by skipping the smooth scroll.
+function centerInView(el: HTMLElement) {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+}
+
 export function ProofCard({
   project,
   badge,
+  carousel,
   isActive,
   onActivate,
   onFocus,
@@ -52,9 +64,11 @@ export function ProofCard({
    * the slot ready the moment a verifiable metric lands.
    */
   badge?: string;
+  /** Whether the mobile carousel layout is active (changes hover/tap behaviour). */
+  carousel: boolean;
   /** Whether this is the grid's single loud card (drives all of the loud CSS). */
   isActive: boolean;
-  /** Hover / first-tap activation request to the coordinator. */
+  /** Hover / first-tap / tap-to-centre activation request to the coordinator. */
   onActivate: (key: string) => void;
   /** Keyboard (focus-visible) focus request to the coordinator. */
   onFocus: (key: string) => void;
@@ -63,7 +77,7 @@ export function ProofCard({
 }) {
   const accent = useAccent();
   // Whether this device's primary pointer is coarse (touch). Read once on mount;
-  // gates hover off and the two-tap navigation gate on for touch only.
+  // gates the desktop-grid two-tap navigation gate on for touch only.
   const coarseRef = useRef(false);
 
   useEffect(() => {
@@ -84,14 +98,17 @@ export function ProofCard({
 
   const handleFocus = useCallback(
     (event: FocusEvent<HTMLAnchorElement>) => {
-      // Only keyboard / programmatic focus reveals on focus. A touch tap that
-      // incidentally focuses the link is not focus-visible, so it is left to the
-      // click gate (preserving the two-tap reveal-then-go on coarse pointers).
+      // Only keyboard / programmatic focus reveals. A touch tap that incidentally
+      // focuses the link is not focus-visible, so it is left to the click gate.
       if (event.currentTarget.matches(":focus-visible")) {
         onFocus(project.key);
+        // In the carousel, keep the keyboard-focused card centred and legible.
+        if (carousel) {
+          centerInView(event.currentTarget);
+        }
       }
     },
-    [onFocus, project.key]
+    [carousel, onFocus, project.key]
   );
 
   const handleBlur = useCallback(() => {
@@ -99,30 +116,43 @@ export function ProofCard({
   }, [onBlur, project.key]);
 
   const handlePointerEnter = useCallback(() => {
-    // Hover is a fine-pointer affordance only; on touch the tap gate rules.
-    if (!coarseRef.current) {
+    // Hover is a desktop-grid, fine-pointer affordance only. In the carousel the
+    // scroll observer owns the active card, and on touch the tap gate rules, so
+    // hover never activates there (this is the scroll-triggers-hover fix).
+    if (!(carousel || coarseRef.current)) {
       onActivate(project.key);
     }
-  }, [onActivate, project.key]);
+  }, [carousel, onActivate, project.key]);
 
   const handlePointerLeave = useCallback(() => {
-    if (!coarseRef.current) {
+    if (!(carousel || coarseRef.current)) {
       onPointerLeave(project.key);
     }
-  }, [onPointerLeave, project.key]);
+  }, [carousel, onPointerLeave, project.key]);
 
   const handleClick = useCallback(
     (event: MouseEvent<HTMLAnchorElement>) => {
-      // The touch gate: on a coarse pointer, a pointer-driven tap (detail !== 0)
-      // on a not-yet-active card reveals it instead of navigating. Keyboard and
-      // screen-reader activations report detail === 0 and fall straight through
-      // to navigation, as do all fine-pointer (mouse) clicks.
+      if (carousel) {
+        // Scroll picks/focuses. A tap on a card that isn't centred brings it to
+        // centre and focuses it instead of leaving; a tap on the centred (active)
+        // card falls through to navigation.
+        if (!isActive) {
+          event.preventDefault();
+          onActivate(project.key);
+          centerInView(event.currentTarget);
+        }
+        return;
+      }
+      // Desktop-grid touch gate: on a coarse pointer, a pointer-driven tap
+      // (detail !== 0) on a not-yet-active card reveals it instead of navigating.
+      // Keyboard / screen-reader activations report detail === 0 and navigate on
+      // the first try, as do all fine-pointer (mouse) clicks.
       if (coarseRef.current && event.detail !== 0 && !isActive) {
         event.preventDefault();
         onActivate(project.key);
       }
     },
-    [isActive, onActivate, project.key]
+    [carousel, isActive, onActivate, project.key]
   );
 
   return (

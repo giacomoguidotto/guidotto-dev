@@ -64,10 +64,54 @@
   list-style: none;
 }
 
-/* one column when there isn't room for the 2x2 */
+/* mobile (<= 40rem): a vertical, centre-focused snap carousel instead of the 2x2
+   grid. The card nearest the scroller's centre is the loud one (set by the
+   IntersectionObserver centre band in ProofGrid); scroll-snap settles to it, so a
+   swipe lands on the closest project and focuses it. Neighbours recede (smaller +
+   quieter) so there's room to sense and pick the next one. Hover never activates
+   here (gated off in the card), which removes the scroll-triggers-hover glitch. */
 @media (max-width: 40rem) {
+  .section {
+    padding: 0;
+  }
+
   .grid {
     grid-template-columns: minmax(0, 1fr);
+    gap: clamp(1.25rem, 5vw, 2.25rem);
+    width: 100%;
+    height: 100svh;
+    /* let the first and last cards reach the vertical centre */
+    padding-block: 28svh;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none;
+  }
+
+  .grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .item {
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
+
+  /* neighbours shrink and quiet down; the centred (active) card is full and
+     clear. Transform-only, so snap positions stay measured on the unscaled box. */
+  .card {
+    max-width: min(82vw, 22rem);
+    margin-inline: auto;
+    opacity: 0.5;
+    transform: scale(0.88);
+    transition:
+      transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 0.45s ease;
+  }
+
+  .card[data-active="true"] {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -103,7 +147,8 @@
   position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  /* the work sits in a square poster (1:1), as imagined */
+  aspect-ratio: 1 / 1;
   border-radius: 1.4rem;
   /* gentle lift when loud; no parallax, no float, no depth blur at rest */
   transform: translate3d(0, 0, 0) scale(1);
@@ -251,30 +296,29 @@
 }
 
 /* on-focus reveal: the bigger-picture copy + the single proof badge slot.
-   Collapsed at rest, expanded when the card is loud. Animated with max-height +
-   opacity (not the grid 0fr -> 1fr trick, which briefly lays out a second row
-   and stutters). The cap is generous enough for the longest copy at narrow
-   widths; the content is plain text with no focusable children, so clipping it
-   at rest is safe. */
+   It is ALWAYS laid out (the card breathes enough room for it at rest), and only
+   its opacity / a small offset animate. Reserving the space at rest is what kills
+   the caption CLS: revealing the copy never changes the card's height, so no
+   sibling card is ever pushed. The content is plain text with no focusable
+   children, so being transparent at rest traps nothing. */
 .onFocus {
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
-  max-height: 0;
-  overflow: hidden;
   font-family: var(--font-display), Georgia, serif;
   font-size: 0.92rem;
   line-height: 1.45;
   color: color-mix(in oklch, var(--ivory) 78%, transparent);
   opacity: 0;
+  transform: translateY(0.4rem);
   transition:
-    max-height 0.5s ease,
-    opacity 0.5s ease;
+    opacity 0.5s ease,
+    transform 0.5s ease;
 }
 
 .card[data-active="true"] .onFocus {
-  max-height: 22rem;
   opacity: 1;
+  transform: none;
 }
 
 /* the single proof badge — at most one, and dark until a real KPI is sourced
@@ -296,6 +340,7 @@
 /* reduced motion: collapse to a static, fully legible card (poster only, no
    sweep, no scale) with the at-rest line, tag, and on-focus copy all shown */
 @media (prefers-reduced-motion: reduce) {
+  .card,
   .vessel,
   .surface,
   .media,
@@ -318,7 +363,7 @@
   }
 
   .onFocus {
-    max-height: none;
     opacity: 1;
+    transform: none;
   }
 }
