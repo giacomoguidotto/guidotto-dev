@@ -8,10 +8,13 @@
 
    The glass framing here replicates GlassVessel's layers (rim light, gloss
    sweep, specular, inner shadow) rather than composing it, because a proof card
-   must be a navigating <a href={repoUrl}>, not GlassVessel's <button>. Each card
-   blooms its own --accent on hover / focus / touch, and only one card is loud at
-   a time: the :hover / :focus-visible card here, reinforced by the single-root
-   --live-accent the ShowcaseRoot writes (one property, one lead). */
+   must be a navigating <a href={repoUrl}>, not GlassVessel's <button>. A card's
+   loud state (glass, gloss, media sharpen, reveal) is driven by [data-active],
+   set by the single-active-card coordinator in ProofGrid, NOT by each card's own
+   :hover / :focus-visible. That is what guarantees only one card is ever loud:
+   keyboard-focusing one card and hovering another cannot both answer. The
+   single-root --live-accent the ShowcaseRoot writes follows the same one active
+   card (one property, one lead). :focus-visible here is only the focus ring. */
 
 /* the stage used by the standalone preview route (mirrors the hero field, but
    grows with content instead of clipping to one viewport) */
@@ -73,7 +76,9 @@
 }
 
 /* the whole card is the link: it navigates to the repo AND is the focus/hover/
-   touch target that drives the earned accent */
+   touch target. The loud state is driven by [data-active] (the grid's single
+   active card), never by this card's own :hover / :focus-visible, so two cards
+   can never answer loudly at once. :focus-visible is kept only for the ring. */
 .card {
   --c: var(--accent, var(--ivory));
   position: relative;
@@ -100,13 +105,12 @@
   width: 100%;
   aspect-ratio: 4 / 3;
   border-radius: 1.4rem;
-  /* gentle lift on focus; no parallax, no float, no depth blur at rest */
+  /* gentle lift when loud; no parallax, no float, no depth blur at rest */
   transform: translate3d(0, 0, 0) scale(1);
   transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.card:hover .vessel,
-.card:focus-visible .vessel {
+.card[data-active="true"] .vessel {
   transform: translate3d(0, 0, 0) scale(1.015);
 }
 
@@ -120,13 +124,12 @@
   transition: box-shadow 0.5s ease;
 }
 
-.card:hover .surface,
-.card:focus-visible .surface {
+.card[data-active="true"] .surface {
   box-shadow: 0 26px 80px -18px color-mix(in oklch, var(--c) 55%, transparent);
 }
 
 /* the media is ProjectMedia's motif (the intentional placeholder behind the
-   media seam). Sharp at rest (NO blur) but a touch calmer; on focus it
+   media seam). Sharp at rest (NO blur) but a touch calmer; when loud it
    saturates / brightens (the "sharpen / play" read, done as a visual treatment
    since real recordings are pending owner assets). The filter rides this local
    wrapper so we never reach into ProjectMedia's own class names. */
@@ -138,13 +141,12 @@
   transition: filter 0.55s ease;
 }
 
-.card:hover .media,
-.card:focus-visible .media {
+.card[data-active="true"] .media {
   filter: saturate(1.05) brightness(1.05);
 }
 
 /* the accent bloom — a screened wash of the project accent that surfaces over
-   the media on focus (the "accent blooms, saturated on cards" beat) */
+   the media when loud (the "accent blooms, saturated on cards" beat) */
 .bloom {
   position: absolute;
   inset: 0;
@@ -160,8 +162,7 @@
   transition: opacity 0.5s ease;
 }
 
-.card:hover .bloom,
-.card:focus-visible .bloom {
+.card[data-active="true"] .bloom {
   opacity: 0.85;
 }
 
@@ -185,8 +186,7 @@
     box-shadow 0.5s ease;
 }
 
-.card:hover .glass,
-.card:focus-visible .glass {
+.card[data-active="true"] .glass {
   border-color: color-mix(in oklch, var(--c) 70%, transparent);
   box-shadow:
     inset 0 1px 1px color-mix(in oklch, var(--glass-specular) 80%, white),
@@ -194,7 +194,7 @@
     inset 0 0 30px -6px color-mix(in oklch, var(--c) 55%, transparent);
 }
 
-/* gloss sweep on focus — the glass tell (clipped by the surface) */
+/* gloss sweep when loud — the glass tell (clipped by the surface) */
 .sweep {
   position: absolute;
   inset: 0;
@@ -210,8 +210,7 @@
   transition: transform 0.9s ease;
 }
 
-.card:hover .sweep,
-.card:focus-visible .sweep {
+.card[data-active="true"] .sweep {
   transform: translateX(130%);
 }
 
@@ -252,34 +251,29 @@
 }
 
 /* on-focus reveal: the bigger-picture copy + the single proof badge slot.
-   Collapsed at rest with the 0fr -> 1fr grid-row trick (animatable height,
-   zero layout cost at rest). */
-.onFocusWrap {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.5s ease;
-}
-
-.card:hover .onFocusWrap,
-.card:focus-visible .onFocusWrap {
-  grid-template-rows: 1fr;
-}
-
+   Collapsed at rest, expanded when the card is loud. Animated with max-height +
+   opacity (not the grid 0fr -> 1fr trick, which briefly lays out a second row
+   and stutters). The cap is generous enough for the longest copy at narrow
+   widths; the content is plain text with no focusable children, so clipping it
+   at rest is safe. */
 .onFocus {
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
+  max-height: 0;
   overflow: hidden;
   font-family: var(--font-display), Georgia, serif;
   font-size: 0.92rem;
   line-height: 1.45;
   color: color-mix(in oklch, var(--ivory) 78%, transparent);
   opacity: 0;
-  transition: opacity 0.5s ease;
+  transition:
+    max-height 0.5s ease,
+    opacity 0.5s ease;
 }
 
-.card:hover .onFocus,
-.card:focus-visible .onFocus {
+.card[data-active="true"] .onFocus {
+  max-height: 22rem;
   opacity: 1;
 }
 
@@ -308,7 +302,6 @@
   .bloom,
   .glass,
   .sweep,
-  .onFocusWrap,
   .onFocus,
   .title,
   .tag,
@@ -316,8 +309,7 @@
     transition: none;
   }
 
-  .card:hover .vessel,
-  .card:focus-visible .vessel {
+  .card[data-active="true"] .vessel {
     transform: none;
   }
 
@@ -325,11 +317,8 @@
     display: none;
   }
 
-  .onFocusWrap {
-    grid-template-rows: 1fr;
-  }
-
   .onFocus {
+    max-height: none;
     opacity: 1;
   }
 }
