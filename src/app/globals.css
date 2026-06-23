@@ -432,11 +432,16 @@ body {
     "SOFT" 40,
     "WONK" 0;
   font-weight: 360;
-  line-height: 1.05;
-  letter-spacing: -0.015em;
+  /* a stanza of lines: let it breathe between them, slightly looser tracking */
+  line-height: 1.22;
+  letter-spacing: 0.01em;
   text-wrap: balance;
   text-shadow: 0 2px 44px
     color-mix(in oklch, var(--stage-deep) 85%, transparent);
+}
+
+.thesis__line {
+  display: block;
 }
 
 .subline {

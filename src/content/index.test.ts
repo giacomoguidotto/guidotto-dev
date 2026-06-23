@@ -54,6 +54,14 @@ describe("hero", () => {
     expect(content.hero.subline).toBe("Chasing ideas to make an impact.");
     expect(content.hero.scrollBaton).toBe("DIVE IN ↓");
   });
+
+  test("thesis decomposes into a three-line display stanza", () => {
+    expect(content.hero.thesisLines).toEqual([
+      "A physics library",
+      "A map for tangled systems",
+      "Two productivity apps. A love letter",
+    ]);
+  });
 });
 
 describe("projects (the four grid peers)", () => {

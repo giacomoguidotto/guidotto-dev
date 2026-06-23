@@ -41,8 +41,14 @@ export interface HeroContent {
   /** Mono scroll baton. */
   readonly scrollBaton: string;
   readonly subline: string;
-  /** Fraunces thesis line (the LCP headline). */
+  /** Fraunces thesis line (the LCP headline; verbatim canonical sentence). */
   readonly thesis: string;
+  /**
+   * The thesis as a display stanza: the sentence broken across lines, with the
+   * line break standing in for the boundary periods. Visual layout of `thesis`;
+   * `thesis` stays the canonical sentence for SEO and accessibility.
+   */
+  readonly thesisLines: readonly string[];
 }
 
 export interface Project {
@@ -148,6 +154,11 @@ export const content: Content = {
     eyebrow: "PLATFORM · PRODUCT · AI & RESEARCH",
     thesis:
       "A physics library. A map for tangled systems. Two productivity apps. A love letter.",
+    thesisLines: [
+      "A physics library",
+      "A map for tangled systems",
+      "Two productivity apps. A love letter",
+    ],
     subline: "Chasing ideas to make an impact.",
     scrollBaton: "DIVE IN ↓",
   },

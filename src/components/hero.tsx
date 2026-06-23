@@ -103,7 +103,13 @@ export function Hero() {
 
       <main className="vitrine__copy">
         <p className="eyebrow">{hero.eyebrow}</p>
-        <h1 className="thesis">{hero.thesis}</h1>
+        <h1 aria-label={hero.thesis} className="thesis">
+          {hero.thesisLines.map((line) => (
+            <span className="thesis__line" key={line}>
+              {line}
+            </span>
+          ))}
+        </h1>
         <p className="subline">{hero.subline}</p>
         <a className="cta" href="#contact">
           <span className="cta__dot" />
