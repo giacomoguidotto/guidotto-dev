@@ -1,0 +1,280 @@
+/* Contact door — the CTA close (#7): one loud owned door, a quiet rail beneath.
+
+   Co-located module CSS, kept OUT of globals.css so this slice owns its own
+   surface and never merge-conflicts with the parallel hero / proof-grid slices.
+   It only READS the global design tokens (the stage tokens --stage-*, the warm
+   --ivory, the glass rim --glass-rim, the mono/display fonts); it never edits
+   them.
+
+   The door is a native <details>/<summary>: it opens with no JS. The reveal is a
+   transform + opacity enhancement (FLIP-style) on the panel, and it collapses to
+   an instant show under prefers-reduced-motion at the foot of this file. */
+
+/* the stage used by the standalone preview route (mirrors the hero field, but
+   grows with content instead of clipping to one viewport) */
+.stage {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 100svh;
+  padding: clamp(2rem, 8vh, 6rem) 1.5rem;
+  color: var(--ivory);
+  background: radial-gradient(
+    130% 105% at 50% 16%,
+    var(--stage-1) 0%,
+    var(--stage-2) 52%,
+    var(--stage-3) 100%
+  );
+}
+
+.contact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 32rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+/* ---------- the door ---------- */
+
+.door {
+  width: 100%;
+}
+
+/* the closed door reads as the single loud pill CTA (mirrors .cta in globals) */
+.summary {
+  display: inline-flex;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.8rem 1.5rem;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.82rem;
+  color: var(--ivory);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  list-style: none;
+  background: color-mix(in oklch, var(--ivory) 6%, transparent);
+  border: 1px solid color-mix(in oklch, var(--ivory) 38%, transparent);
+  border-radius: 999px;
+  transition:
+    border-color 0.4s ease,
+    background 0.4s ease,
+    transform 0.2s ease;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.summary:hover {
+  background: color-mix(in oklch, var(--ivory) 10%, transparent);
+  border-color: color-mix(in oklch, var(--ivory) 62%, transparent);
+  transform: translateY(-1px);
+}
+
+.summary:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--ivory) 70%, transparent);
+  outline-offset: 3px;
+}
+
+.summaryDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  background: var(--ivory);
+  border-radius: 999px;
+}
+
+/* ---------- the revealed form frame ---------- */
+
+.panel {
+  margin-top: 1.1rem;
+}
+
+.door[open] .panel {
+  animation: reveal 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.4rem;
+  text-align: left;
+  background: color-mix(in oklch, var(--stage-1) 70%, transparent);
+  border: 1px solid var(--glass-rim);
+  border-radius: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fieldLabel {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.66rem;
+  color: color-mix(in oklch, var(--ivory) 64%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 0.95rem;
+  color: var(--ivory);
+  background: color-mix(in oklch, var(--stage-deep) 55%, transparent);
+  border: 1px solid color-mix(in oklch, var(--ivory) 16%, transparent);
+  border-radius: 9px;
+  transition:
+    border-color 0.3s ease,
+    background 0.3s ease;
+}
+
+.textarea {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
+.input:focus,
+.textarea:focus {
+  outline: none;
+  background: color-mix(in oklch, var(--stage-deep) 70%, transparent);
+  border-color: color-mix(in oklch, var(--ivory) 42%, transparent);
+}
+
+.send {
+  align-self: flex-start;
+  padding: 0.7rem 1.5rem;
+  margin-top: 0.2rem;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.78rem;
+  color: var(--stage-3);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  background: var(--ivory);
+  border: none;
+  border-radius: 999px;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.send:hover {
+  transform: translateY(-1px);
+}
+
+.send:disabled {
+  cursor: progress;
+  opacity: 0.55;
+  transform: none;
+}
+
+.confirmation {
+  margin: 1.4rem 0;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.05rem;
+  font-style: italic;
+  color: var(--ivory);
+}
+
+.error {
+  margin: 0;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  color: oklch(0.72 0.16 25);
+}
+
+/* honeypot: present in the DOM for bots, never seen or reached by a human */
+.honeypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  clip: rect(0 0 0 0);
+}
+
+/* ---------- the quiet rail (icons only, "or find me here") ---------- */
+
+.rail {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1.3rem;
+}
+
+.railLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  color: color-mix(in oklch, var(--ivory) 60%, transparent);
+  border-radius: 999px;
+  transition:
+    color 0.3s ease,
+    background 0.3s ease;
+}
+
+.railLink:hover {
+  color: var(--ivory);
+  background: color-mix(in oklch, var(--ivory) 8%, transparent);
+}
+
+.railLink:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--ivory) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.railLinkDark {
+  color: color-mix(in oklch, var(--ivory) 26%, transparent);
+  cursor: not-allowed;
+}
+
+.railLinkDark:hover {
+  color: color-mix(in oklch, var(--ivory) 26%, transparent);
+  background: none;
+}
+
+.railIcon {
+  display: block;
+}
+
+/* ---------- reduced motion: instant show, no FLIP ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .door[open] .panel {
+    animation: none;
+  }
+
+  .summary,
+  .send,
+  .railLink,
+  .input,
+  .textarea {
+    transition: none;
+  }
+
+  .summary:hover,
+  .send:hover {
+    transform: none;
+  }
+}
