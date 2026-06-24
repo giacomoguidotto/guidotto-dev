@@ -83,6 +83,7 @@ function QuietRail() {
 export function ContactDoor() {
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<Status>("idle");
+  const [errorReason, setErrorReason] = useState<string | null>(null);
 
   // Enhancement: when the door opens, hand focus to the first field.
   const handleToggle = (event: SyntheticEvent<HTMLDetailsElement>) => {
@@ -94,6 +95,7 @@ export function ContactDoor() {
   const submit = async (form: HTMLFormElement) => {
     const data = new FormData(form);
     setStatus("sending");
+    setErrorReason(null);
     try {
       const response = await fetch("/api/contact", {
         method: "POST",
@@ -106,7 +108,15 @@ export function ContactDoor() {
           token: data.get("cf-turnstile-response"),
         }),
       });
-      setStatus(response.ok ? "sent" : "error");
+      if (response.ok) {
+        setStatus("sent");
+        return;
+      }
+      const body = (await response.json().catch(() => null)) as {
+        error?: unknown;
+      } | null;
+      setErrorReason(typeof body?.error === "string" ? body.error : null);
+      setStatus("error");
     } catch {
       setStatus("error");
     }
@@ -133,7 +143,7 @@ export function ContactDoor() {
               {cta.confirmation}
             </p>
           ) : (
-            <form className={styles.form} noValidate onSubmit={handleSubmit}>
+            <form className={styles.form} onSubmit={handleSubmit}>
               {/* Honeypot: off-screen, no human ever fills it; a bot that does
                   gets a friendly 200 and nothing sent. */}
               <div aria-hidden="true" className={styles.honeypot}>
@@ -200,7 +210,7 @@ export function ContactDoor() {
 
               {status === "error" ? (
                 <p className={styles.error} role="alert">
-                  Something went wrong. Please try again.
+                  {errorReason ?? "Something went wrong. Please try again."}
                 </p>
               ) : null}
             </form>

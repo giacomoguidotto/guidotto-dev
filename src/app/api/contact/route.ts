@@ -10,8 +10,11 @@ import { handleContactSubmission } from "~/contact/handle-submission";
 export async function POST(request: Request): Promise<Response> {
   const body = await request.json().catch(() => null);
 
-  const forwarded = request.headers.get("x-forwarded-for");
-  const remoteIp = forwarded ? (forwarded.split(",")[0]?.trim() ?? null) : null;
+  // Vercel sets x-real-ip to the platform-sanitized client IP. We trust only
+  // that, never the client-spoofable left-most x-forwarded-for, so the
+  // rate-limit key can't be trivially rotated. No header -> null, and the
+  // handler keys the window on the submitted email instead.
+  const remoteIp = request.headers.get("x-real-ip");
 
   const outcome = await handleContactSubmission(
     body,

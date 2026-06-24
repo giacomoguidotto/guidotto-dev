@@ -37,10 +37,18 @@ export type Clock = () => number;
 
 /** A rolling submission counter keyed by client. Production is durable; tests in-memory. */
 export interface RateLimitStore {
-  /** How many submissions `key` has recorded at or after `sinceMs`. */
-  count(key: string, sinceMs: number): Promise<number>;
-  /** Record one submission for `key` at `atMs`. */
-  record(key: string, atMs: number): Promise<void>;
+  /**
+   * Atomically reserve a slot for `key` in the `windowMs` window ending at
+   * `atMs`. Returns `true` and records the hit when the client is under `max`,
+   * or `false` (recording nothing) once the cap is reached. One call — so a
+   * burst of concurrent submissions can't all slip past a separate read/record.
+   */
+  consume(
+    key: string,
+    atMs: number,
+    windowMs: number,
+    max: number
+  ): Promise<boolean>;
 }
 
 export interface ContactDeps {
@@ -75,6 +83,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STATUS_INVALID = 400;
 const STATUS_FORBIDDEN = 403;
 const STATUS_RATE_LIMITED = 429;
+const STATUS_SEND_FAILED = 502;
 
 // === validation ============================================================
 
@@ -96,8 +105,8 @@ function readString(value: unknown): string {
 
 /**
  * Narrow the untrusted JSON body into a {@link ParsedSubmission}, or fail with a
- * legible reason. The Turnstile token is read from either `token` or the native
- * Turnstile field name so the no-JS form post and the fetch path agree.
+ * legible reason. The Turnstile token rides in `token`; the client maps the
+ * widget's native `cf-turnstile-response` field into it before posting.
  */
 function parseSubmission(input: unknown): ParseResult {
   if (typeof input !== "object" || input === null) {
@@ -107,7 +116,7 @@ function parseSubmission(input: unknown): ParseResult {
   const name = readString(body.name).trim();
   const email = readString(body.email).trim();
   const message = readString(body.message).trim();
-  const token = readString(body.token ?? body["cf-turnstile-response"]);
+  const token = readString(body.token);
   const honeypot = readString(body.honeypot);
 
   if (name.length === 0 || name.length > MAX_NAME) {
@@ -129,7 +138,9 @@ function parseSubmission(input: unknown): ParseResult {
  *
  * Order is deliberate: cheap local checks first, then the network proof, then
  * the rate gate, then the send. A honeypot hit returns a friendly `ok` with
- * nothing sent, so a bot never learns it was caught.
+ * nothing sent, so a bot never learns it was caught. The rate slot is reserved
+ * before the send — atomically, and whether or not the send succeeds — so a
+ * flapping provider can't invite an unbounded retry storm.
  */
 export async function handleContactSubmission(
   input: unknown,
@@ -156,9 +167,13 @@ export async function handleContactSubmission(
   }
 
   const key = context.remoteIp ?? email.toLowerCase();
-  const now = deps.now();
-  const recent = await deps.rateLimit.count(key, now - RATE_WINDOW_MS);
-  if (recent >= RATE_MAX) {
+  const allowed = await deps.rateLimit.consume(
+    key,
+    deps.now(),
+    RATE_WINDOW_MS,
+    RATE_MAX
+  );
+  if (!allowed) {
     return {
       ok: false,
       status: STATUS_RATE_LIMITED,
@@ -166,7 +181,14 @@ export async function handleContactSubmission(
     };
   }
 
-  await deps.sendEmail({ email, message, name });
-  await deps.rateLimit.record(key, now);
+  try {
+    await deps.sendEmail({ email, message, name });
+  } catch {
+    return {
+      ok: false,
+      status: STATUS_SEND_FAILED,
+      error: "couldn't send right now",
+    };
+  }
   return { ok: true };
 }

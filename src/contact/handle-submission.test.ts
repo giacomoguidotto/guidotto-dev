@@ -5,6 +5,7 @@ import {
   handleContactSubmission,
   RATE_MAX,
   type RateLimitStore,
+  type SendContactEmail,
   type VerifyTurnstile,
 } from "./handle-submission";
 
@@ -16,6 +17,7 @@ const FIXED_NOW = 1_700_000_000_000;
 const STATUS_INVALID = 400;
 const STATUS_FORBIDDEN = 403;
 const STATUS_RATE_LIMITED = 429;
+const STATUS_SEND_FAILED = 502;
 
 const VALID = {
   name: "Ada Lovelace",
@@ -41,16 +43,15 @@ function recordingSender() {
 function inMemoryRateStore(): RateLimitStore {
   const hits = new Map<string, number[]>();
   return {
-    count(key, sinceMs) {
-      const live = (hits.get(key) ?? []).filter((at) => at >= sinceMs);
-      hits.set(key, live);
-      return Promise.resolve(live.length);
-    },
-    record(key, atMs) {
-      const live = hits.get(key) ?? [];
+    consume(key, atMs, windowMs, max) {
+      const live = (hits.get(key) ?? []).filter((at) => at > atMs - windowMs);
+      if (live.length >= max) {
+        hits.set(key, live);
+        return Promise.resolve(false);
+      }
       live.push(atMs);
       hits.set(key, live);
-      return Promise.resolve();
+      return Promise.resolve(true);
     },
   };
 }
@@ -149,5 +150,18 @@ describe("handleContactSubmission (seam #2)", () => {
       error: "too many requests, try again later",
     });
     expect(sent).toHaveLength(RATE_MAX);
+  });
+
+  test("a send failure surfaces as a clean error, not a crash", async () => {
+    const exploding: SendContactEmail = () =>
+      Promise.reject(new Error("resend exploded"));
+    const { deps } = makeDeps({ sendEmail: exploding });
+    const outcome = await handleContactSubmission(VALID, CTX, deps);
+
+    expect(outcome).toEqual({
+      ok: false,
+      status: STATUS_SEND_FAILED,
+      error: "couldn't send right now",
+    });
   });
 });
