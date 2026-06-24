@@ -159,31 +159,33 @@ describe("loadShowpiece (committed packed asset)", () => {
 
 // The float-precision claim needs the raw float32 export, which is gitignored
 // and absent in CI. It runs locally as the verification gate for the shipped
-// asset; CI proves correctness through the committed asset + oracle above.
+// asset; CI proves correctness through the committed asset + oracle above. The
+// suite is declared only when the export is present (no disabled tests).
 const rawExportPresent = existsSync(`${RAW_DIR}/weights.bin`);
-const describeRaw = rawExportPresent ? describe : describe.skip;
 
-describeRaw("loadShowpiece (raw export, float precision)", () => {
-  test("forward pass of the final snapshot reproduces the oracle to float tolerance", async () => {
-    const showpiece = await loadFromRawExport();
-    const converged = showpiece.trajectory(
-      fixture.snapshotIndex,
-      fixture.sampleCount
-    );
-    expect(deviationFromFixture(converged, fixture)).toBeLessThan(
-      FLOAT_TOLERANCE
-    );
-  });
-
-  test("decode(pack(raw)) tracks the raw trajectory within the quantised tolerance", async () => {
-    const raw = await loadFromRawExport();
-    const packed = await loadFromPackedAsset();
-    for (const i of [0, 18, 36]) {
-      const deviation = maxTrajectoryDeviation(
-        raw.trajectory(i, 300),
-        packed.trajectory(i, 300)
+if (rawExportPresent) {
+  describe("loadShowpiece (raw export, float precision)", () => {
+    test("forward pass of the final snapshot reproduces the oracle to float tolerance", async () => {
+      const showpiece = await loadFromRawExport();
+      const converged = showpiece.trajectory(
+        fixture.snapshotIndex,
+        fixture.sampleCount
       );
-      expect(deviation).toBeLessThan(QUANTISED_TOLERANCE);
-    }
+      expect(deviationFromFixture(converged, fixture)).toBeLessThan(
+        FLOAT_TOLERANCE
+      );
+    });
+
+    test("decode(pack(raw)) tracks the raw trajectory within the quantised tolerance", async () => {
+      const raw = await loadFromRawExport();
+      const packed = await loadFromPackedAsset();
+      for (const i of [0, 18, 36]) {
+        const deviation = maxTrajectoryDeviation(
+          raw.trajectory(i, 300),
+          packed.trajectory(i, 300)
+        );
+        expect(deviation).toBeLessThan(QUANTISED_TOLERANCE);
+      }
+    });
   });
-});
+}

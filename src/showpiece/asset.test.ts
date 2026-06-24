@@ -64,6 +64,18 @@ describe("loadShowpieceAsset", () => {
       loadShowpieceAsset({ baseUrl: PACKED_DIR, fetch: notFound })
     ).rejects.toThrow(MANIFEST_ERROR);
   });
+
+  test("a malformed manifest fails with a legible error, not an opaque TypeError", async () => {
+    const badManifest: FetchLike = (url) =>
+      Promise.resolve(
+        url.endsWith("manifest.json")
+          ? Response.json({ system: "lorenz" }) // no weightsFile/weightsEncoding
+          : new Response(null, { status: 404 })
+      );
+    await expect(
+      loadShowpieceAsset({ baseUrl: PACKED_DIR, fetch: badManifest })
+    ).rejects.toThrow(MANIFEST_ERROR);
+  });
 });
 
 describe("codec", () => {
@@ -102,37 +114,39 @@ describe("codec", () => {
 
 // decode(pack(raw)) reproduces the trajectory within tolerance — exercised end
 // to end against the raw float32 export when it is present (gitignored, local).
+// The suite is declared only when the export exists (no disabled tests).
 const rawExportPresent = existsSync(`${RAW_DIR}/weights.bin`);
-const describeRaw = rawExportPresent ? describe : describe.skip;
 
-describeRaw("pack round-trip (raw export)", () => {
-  test("encode then decode reproduces the converged butterfly", async () => {
-    const rawManifest = JSON.parse(
-      await readFile(`${RAW_DIR}/manifest.json`, "utf8")
-    ) as Record<string, unknown>;
-    const observations = JSON.parse(
-      await readFile(`${RAW_DIR}/observations.json`, "utf8")
-    );
-    const rawBuffer = await readArrayBuffer(`${RAW_DIR}/weights.bin`);
-    const manifest = { ...rawManifest, observations } as ShowpieceManifest;
+if (rawExportPresent) {
+  describe("pack round-trip (raw export)", () => {
+    test("encode then decode reproduces the converged butterfly", async () => {
+      const rawManifest = JSON.parse(
+        await readFile(`${RAW_DIR}/manifest.json`, "utf8")
+      ) as Record<string, unknown>;
+      const observations = JSON.parse(
+        await readFile(`${RAW_DIR}/observations.json`, "utf8")
+      );
+      const rawBuffer = await readArrayBuffer(`${RAW_DIR}/weights.bin`);
+      const manifest = { ...rawManifest, observations } as ShowpieceManifest;
 
-    const { bytes, encoding } = await encodeWeights(
-      new Float32Array(rawBuffer)
-    );
-    const roundTripped = await decodeWeights(bytes, encoding);
+      const { bytes, encoding } = await encodeWeights(
+        new Float32Array(rawBuffer)
+      );
+      const roundTripped = await decodeWeights(bytes, encoding);
 
-    const rawShowpiece = loadShowpiece(manifest, rawBuffer);
-    const packedShowpiece = loadShowpiece(manifest, roundTripped);
+      const rawShowpiece = loadShowpiece(manifest, rawBuffer);
+      const packedShowpiece = loadShowpiece(manifest, roundTripped);
 
-    const last = manifest.snapshotCount - 1;
-    const deviation = maxTrajectoryDeviation(
-      rawShowpiece.trajectory(last, 300),
-      packedShowpiece.trajectory(last, 300)
-    );
-    expect(deviation).toBeLessThan(QUANTISED_TOLERANCE);
-    expect(hasBothLobes(packedShowpiece.trajectory(last, 300))).toBe(true);
-    expect(isBounded(packedShowpiece.trajectory(last, 300), COORD_BOUND)).toBe(
-      true
-    );
+      const last = manifest.snapshotCount - 1;
+      const deviation = maxTrajectoryDeviation(
+        rawShowpiece.trajectory(last, 300),
+        packedShowpiece.trajectory(last, 300)
+      );
+      expect(deviation).toBeLessThan(QUANTISED_TOLERANCE);
+      expect(hasBothLobes(packedShowpiece.trajectory(last, 300))).toBe(true);
+      expect(
+        isBounded(packedShowpiece.trajectory(last, 300), COORD_BOUND)
+      ).toBe(true);
+    });
   });
-});
+}

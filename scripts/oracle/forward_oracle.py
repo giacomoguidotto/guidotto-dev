@@ -84,6 +84,9 @@ def main() -> None:
     parser.add_argument("--samples", type=int, default=300)
     args = parser.parse_args()
 
+    if args.samples < 2:
+        parser.error("--samples must be >= 2 (uniform sampling needs both endpoints)")
+
     raw = Path(args.raw)
     manifest = json.loads((raw / "manifest.json").read_text())
     weights = (raw / manifest["weightsFile"]).read_bytes()

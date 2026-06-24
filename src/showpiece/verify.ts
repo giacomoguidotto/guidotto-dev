@@ -48,6 +48,11 @@ export function isBounded(trajectory: Trajectory, bound: number): boolean {
 
 /** Max absolute per-sample deviation between two same-length trajectories. */
 export function maxTrajectoryDeviation(a: Trajectory, b: Trajectory): number {
+  if (a.x.length !== b.x.length) {
+    throw new Error(
+      `trajectory length mismatch: ${a.x.length} vs ${b.x.length}`
+    );
+  }
   let max = 0;
   for (let k = 0; k < a.x.length; k++) {
     max = Math.max(

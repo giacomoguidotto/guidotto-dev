@@ -19,6 +19,11 @@
  * effects. The reference oracle (`scripts/oracle/forward_oracle.py`) pins the
  * arithmetic — both read the same little-endian float32 weights and must agree
  * to float tolerance, so the "genuinely live" forward pass is provable.
+ *
+ * Consumer note: `trajectory()` is synchronous and a full precompute (37
+ * snapshots x 300 samples x 3 MLPs) is ~1B multiply-adds. Run it off the main
+ * thread (Web Worker) or yield between snapshots — this module is pure and takes
+ * plain buffers precisely so it can be hoisted into a worker wholesale.
  */
 
 export interface LayerSpec {
@@ -72,7 +77,11 @@ export interface Params {
   readonly sigma: number;
 }
 
-/** A sampled trajectory in physical coordinates (columnar for WebGL upload). */
+/**
+ * A sampled trajectory in physical coordinates, one columnar `Float64Array` per
+ * axis. float64 (not float32) so the forward pass stays bit-comparable with the
+ * Python oracle; a WebGL consumer narrows these to `Float32Array` on upload.
+ */
 export interface Trajectory {
   readonly tau: Float64Array;
   readonly x: Float64Array;
@@ -184,6 +193,9 @@ export function loadShowpiece(
   const [domainLo, domainHi] = manifest.inputDomain;
 
   const networkCache = new Map<number, readonly FieldNetwork[]>();
+  // Memo caches assume the showpiece's small fixed set of (snapshot, sampleCount)
+  // queries (~37 snapshots at one or two sample counts). They are unbounded by
+  // design; a consumer that varies sampleCount freely would need an LRU bound.
   const trajectoryCache = new Map<string, Trajectory>();
 
   function networksFor(snapshotIndex: number): readonly FieldNetwork[] {

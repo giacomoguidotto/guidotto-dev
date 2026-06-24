@@ -42,6 +42,26 @@ export interface LoadedShowpiece {
 }
 
 /**
+ * Fail loudly and legibly if the fetched JSON is not a packed manifest, before
+ * the codec dereferences `weightsEncoding.dtype` into an opaque `TypeError`.
+ */
+function assertPackedManifest(value: unknown): asserts value is PackedManifest {
+  const manifest = value as Partial<PackedManifest> | null;
+  const encoding = manifest?.weightsEncoding;
+  if (
+    typeof manifest?.weightsFile !== "string" ||
+    typeof encoding !== "object" ||
+    encoding === null ||
+    typeof encoding.dtype !== "string" ||
+    typeof encoding.compression !== "string"
+  ) {
+    throw new Error(
+      "malformed showpiece manifest: missing weightsFile or weightsEncoding"
+    );
+  }
+}
+
+/**
  * Fetch + decode the packed asset and return a ready {@link Showpiece}.
  *
  * Two requests: the JSON manifest, then the gzipped float16 weights. The codec
@@ -63,6 +83,7 @@ export async function loadShowpieceAsset(
     );
   }
   const manifest = (await manifestResponse.json()) as PackedManifest;
+  assertPackedManifest(manifest);
 
   const weightsResponse = await fetchImpl(`${base}/${manifest.weightsFile}`);
   if (!weightsResponse.ok) {

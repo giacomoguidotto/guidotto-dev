@@ -33,6 +33,7 @@ import {
 import {
   hasBothLobes,
   isBounded,
+  maxAbsCoord,
   maxTrajectoryDeviation,
 } from "../src/showpiece/verify";
 
@@ -120,9 +121,8 @@ function verify(
     }
     maxDeviation = Math.max(maxDeviation, deviation);
 
-    for (const value of packedTrajectory.x) {
-      maxCoord = Math.max(maxCoord, Math.abs(value));
-    }
+    // Report the true worst coordinate across all three fields, not just x.
+    maxCoord = Math.max(maxCoord, maxAbsCoord(packedTrajectory));
   }
 
   const convergedRaw = rawShowpiece.trajectory(lastIndex, GATE_SAMPLE_COUNT);
