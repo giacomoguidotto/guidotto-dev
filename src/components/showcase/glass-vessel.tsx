@@ -15,10 +15,10 @@
 //     blur reports release; the lit look is CSS-driven (:hover / :focus-visible)
 //     and transient.
 //   - "tap" (coarse pointer): hover does not exist, so a tap reports activation
-//     and the coordinator keeps `active` set (a tap outside dismisses). Every tap
-//     also fires a short damped-spring press on the glass and replays the gloss
-//     sweep, so re-tapping an already-lit vessel still feels alive without
-//     toggling it off.
+//     and the coordinator keeps `active` set (a tap outside dismisses). The FIRST
+//     tap just selects (its bloom + sweep are the CSS activation). Re-tapping the
+//     already-lit vessel replays a soft, springy press + gloss so it still feels
+//     alive without ever toggling off.
 
 import { type CSSProperties, useRef } from "react";
 import type { Motif } from "~/content";
@@ -38,18 +38,31 @@ export interface PlaneSubject {
   motif: Motif;
 }
 
-// A damped harmonic press: the glass dips under the finger then springs back
-// with a small, decaying overshoot (the physics of a critically-ish underdamped
-// spring). Kept just above 1 at the peak so it never bleeds past the tile.
-const SPRING_PRESS: Keyframe[] = [
-  { transform: "scale(1)", offset: 0 },
-  { transform: "scale(0.92)", offset: 0.18 },
-  { transform: "scale(1.012)", offset: 0.48 },
-  { transform: "scale(0.996)", offset: 0.72 },
-  { transform: "scale(1.003)", offset: 0.88 },
-  { transform: "scale(1)", offset: 1 },
-];
-const SPRING_MS = 480;
+// A soft tactile press, derived from real spring physics rather than a hand-drawn
+// curve: the underdamped impulse response of a damped harmonic oscillator,
+//   d(t) = -A · e^(-ζω·t) · sin(ω_d·t),   ω_d = ω · √(1 - ζ²),
+// sampled into keyframes (CSS has no native spring). It starts and ends exactly
+// at rest (scale 1), dips a little under the finger, and settles back with one
+// gentle, decaying overshoot. Softer = small amplitude + heavier damping; these
+// numbers give roughly a 2% dip and a sub-1% overshoot.
+function dampedPress(): Keyframe[] {
+  const amplitude = 0.05; // peak displacement (a soft ~2% dip after the envelope)
+  const zeta = 0.62; // damping ratio (higher = softer, fewer bounces)
+  const omega = 6; // angular frequency over the normalized duration
+  const samples = 24;
+  const omegaD = omega * Math.sqrt(1 - zeta * zeta);
+  return Array.from({ length: samples + 1 }, (_, i) => {
+    const t = i / samples;
+    const displacement =
+      i === samples
+        ? 0
+        : -amplitude * Math.exp(-zeta * omega * t) * Math.sin(omegaD * t);
+    return { offset: t, transform: `scale(${(1 + displacement).toFixed(4)})` };
+  });
+}
+
+const SPRING_PRESS: Keyframe[] = dampedPress();
+const SPRING_MS = 560;
 
 const SWEEP: Keyframe[] = [
   { transform: "translateX(-130%)" },
@@ -86,29 +99,30 @@ export function GlassVessel({
   const activate = () => onActivate?.(subject.key);
   const deactivate = () => onDeactivate?.();
 
-  // A tap always reactivates (the coordinator never toggles off), and replays
-  // the spring + gloss so re-tapping the lit vessel still feels alive. The CSS
-  // already sweeps when a vessel first becomes active, so only replay the sweep
-  // imperatively on a re-tap (when it is already active) to avoid doubling it.
+  // A tap always (re)activates; the coordinator never toggles off. The spring is
+  // a re-tap reward only: the first tap just selects (the CSS activation handles
+  // its bloom + sweep), so we only play the press + replay the gloss when this
+  // vessel is already the lit one. Reduced-motion skips the motion entirely.
   const handleTap = () => {
     activate();
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (
+      !active ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
       return;
     }
     surfaceRef.current?.animate(SPRING_PRESS, {
       duration: SPRING_MS,
-      easing: "ease-out",
+      easing: "linear",
     });
-    if (active) {
-      sweepRef.current?.animate(SWEEP, { duration: SWEEP_MS, easing: "ease" });
-    }
+    sweepRef.current?.animate(SWEEP, { duration: SWEEP_MS, easing: "ease" });
   };
 
   const vesselStyle = { "--accent": subject.accent } as CSSProperties;
 
   // A button in both modes (the vessel never navigates). On a fine pointer it
   // reports hover/focus and the lit look is CSS-driven; on a coarse pointer a
-  // tap reports activation, springs, and the coordinator keeps `active`.
+  // tap reports activation, springs on re-tap, and the coordinator keeps `active`.
   return (
     <button
       aria-label={tap ? subject.label : `Focus ${subject.label}`}

@@ -32,20 +32,23 @@ import {
 import { ShowcaseRoot, useAccent } from "~/components/showcase/showcase-root";
 import { content } from "~/content";
 
-/** Absolute placement inside the field (landscape or portrait). */
+/** Position + width inside the field. The height is not given: it comes from
+ *  `ar` (CSS aspect-ratio), so a vessel keeps its shape on resize instead of
+ *  stretching as independent vw width / vh height. */
 interface Placement {
-  h: string;
   w: string;
   x: string;
   y: string;
 }
 
-/** A placement plus depth and the content key that fills it. */
+/** A placement plus its aspect ratio, depth, and the content key that fills it. */
 interface PlaneSpec extends Placement {
+  /** Width-to-height ratio (CSS aspect-ratio), shared by both layouts. */
+  ar: string;
   depth: 1 | 2 | 3;
   /** The content key (a project or the showpiece) that fills this plane. */
   key: string;
-  /** Portrait placement; absent means the plane is hidden on mobile. */
+  /** Portrait placement (position + width); absent means hidden on mobile. */
   mobile?: Placement;
 }
 
@@ -62,40 +65,43 @@ const { showpiece, projects, hero } = content;
 const subjectFor = (key: string): PlaneSubject | undefined =>
   key === showpiece.key ? showpiece : projects.find((p) => p.key === key);
 
-// Cases hug the edges and leave a central band clear for the thesis. The three
-// planes with a `mobile` placement (the showpiece plus one warm and one cool
-// project, for accent variety) reframe to flank the thesis on portrait; the two
-// without it drop out so the small composition stays legible.
+// Two flanking clusters that leave a central band clear for the thesis, pulled
+// in from the far edges so the contact sheet reads as one grouped composition
+// rather than scattered corners. Each vessel is sized by width + `ar`, so it
+// holds its shape on resize. The three planes with a `mobile` placement (the
+// showpiece plus one warm and one cool project, for accent variety) reframe to
+// flank the thesis on portrait; the two without it drop out so the small
+// composition stays legible.
 const PLANE_SPECS: PlaneSpec[] = [
   {
     key: showpiece.key,
     depth: 2,
-    x: "4%",
-    y: "13%",
-    w: "23vw",
-    h: "34vh",
-    mobile: { x: "27%", y: "4%", w: "46vw", h: "20vh" },
+    x: "10%",
+    y: "15%",
+    w: "21vw",
+    ar: "1.08",
+    mobile: { x: "27%", y: "4%", w: "46vw" },
   },
-  { key: "orray", depth: 1, x: "6%", y: "55%", w: "21vw", h: "31vh" },
+  { key: "orray", depth: 1, x: "12%", y: "53%", w: "19vw", ar: "1.08" },
   {
     key: "scry",
     depth: 2,
-    x: "73%",
-    y: "9%",
-    w: "23vw",
-    h: "30vh",
-    mobile: { x: "53%", y: "71%", w: "43vw", h: "21vh" },
+    x: "67%",
+    y: "11%",
+    w: "21vw",
+    ar: "1.24",
+    mobile: { x: "53%", y: "71%", w: "43vw" },
   },
   {
     key: "tempo",
     depth: 3,
-    x: "75%",
-    y: "51%",
-    w: "21vw",
-    h: "33vh",
-    mobile: { x: "4%", y: "66%", w: "45vw", h: "22vh" },
+    x: "69%",
+    y: "50%",
+    w: "19vw",
+    ar: "1.02",
+    mobile: { x: "4%", y: "66%", w: "45vw" },
   },
-  { key: "ginevra", depth: 3, x: "40%", y: "5%", w: "22vw", h: "19vh" },
+  { key: "ginevra", depth: 3, x: "42%", y: "6%", w: "18vw", ar: "1.85" },
 ];
 
 const PLANES: Plane[] = PLANE_SPECS.flatMap(({ key, ...rest }) => {
@@ -201,12 +207,11 @@ function VitrineStage() {
                 "--x": plane.x,
                 "--y": plane.y,
                 "--w": plane.w,
-                "--h": plane.h,
+                "--ar": plane.ar,
                 ...(plane.mobile && {
                   "--mob-x": plane.mobile.x,
                   "--mob-y": plane.mobile.y,
                   "--mob-w": plane.mobile.w,
-                  "--mob-h": plane.mobile.h,
                 }),
               } as CSSProperties
             }

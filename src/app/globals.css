@@ -187,12 +187,15 @@ body {
 
 .case {
   position: absolute;
-  /* placement comes from per-plane custom properties so the stylesheet can
-     re-author portrait geometry without fighting inline styles */
+  /* placement + size come from per-plane custom properties so the stylesheet can
+     re-author portrait geometry without fighting inline styles. Width drives the
+     size and aspect-ratio fixes the height, so a vessel keeps its shape when the
+     viewport is resized instead of stretching as independent vw width / vh
+     height. */
   top: var(--y);
   left: var(--x);
   width: var(--w);
-  height: var(--h);
+  aspect-ratio: var(--ar);
   /* the work breathing (content motion is allowed; chrome stays still) */
   animation: float 22s ease-in-out infinite;
 }
@@ -516,7 +519,8 @@ body {
     top: var(--mob-y, var(--y));
     left: var(--mob-x, var(--x));
     width: var(--mob-w, var(--w));
-    height: var(--mob-h, var(--h));
+    /* aspect-ratio is inherited from the base rule, so the height still derives
+       from the shared `--ar` and the portrait tiles keep their shape too */
   }
 
   .case[data-mobile-hidden] {
