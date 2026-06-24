@@ -185,10 +185,10 @@
 }
 
 /* the elaboration — a quieter, reflective second voice that lands after the
-   greeting, set smaller and in italic so the rhythm of the read is greeting,
-   then aside */
+   greeting, set smaller and in italic, and hand-broken into three lines (the
+   max-width is only a guard; the explicit line breaks shape the read) */
 .elaboration {
-  max-width: 30ch;
+  max-width: 40ch;
   margin: 0;
   font-family: var(--font-display), Georgia, serif;
   font-size: clamp(1.05rem, 1.8vw, 1.28rem);
@@ -235,7 +235,7 @@
   }
 
   .elaboration {
-    max-width: 34ch;
+    max-width: 40ch;
   }
 
   .signature {

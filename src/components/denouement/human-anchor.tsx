@@ -22,6 +22,7 @@
 // invented copy) and can be overridden via `portraitAlt`.
 
 import Image from "next/image";
+import { Fragment } from "react";
 import { content } from "~/content";
 import styles from "./denouement.module.css";
 import { Signature } from "./signature";
@@ -41,6 +42,32 @@ export function HumanAnchor({
       : personalLine.slice(0, sentenceBreak + 1);
   const elaboration =
     sentenceBreak === -1 ? "" : personalLine.slice(sentenceBreak + 2).trim();
+
+  // Break the elaboration onto its own display lines along its comma clauses,
+  // keeping the first two together: "Forever curious, always improving," /
+  // "never quite comfortable," / "and building something that matters." This is
+  // line-breaking only — every clause is the exact content string, in order, with
+  // the consumed comma re-added at each break. Counts drive the grouping, and any
+  // clauses the copy might grow beyond them ride on the last line so nothing is
+  // dropped.
+  const clauses = elaboration ? elaboration.split(", ") : [];
+  const lineClauseCounts = [2, 1, 1];
+  const elaborationLines: string[] = [];
+  let clauseIndex = 0;
+  for (const count of lineClauseCounts) {
+    const lineClauses = clauses.slice(clauseIndex, clauseIndex + count);
+    clauseIndex += count;
+    if (lineClauses.length > 0) {
+      elaborationLines.push(lineClauses.join(", "));
+    }
+  }
+  if (clauseIndex < clauses.length) {
+    elaborationLines[elaborationLines.length - 1] +=
+      `, ${clauses.slice(clauseIndex).join(", ")}`;
+  }
+  const renderedLines = elaborationLines.map((line, i) =>
+    i < elaborationLines.length - 1 ? `${line},` : line
+  );
 
   return (
     <section className={styles.human}>
@@ -71,8 +98,15 @@ export function HumanAnchor({
 
       <div className={styles.humanText}>
         <p className={styles.greeting}>{greeting}</p>
-        {elaboration ? (
-          <p className={styles.elaboration}>{elaboration}</p>
+        {renderedLines.length > 0 ? (
+          <p className={styles.elaboration}>
+            {renderedLines.map((line, i) => (
+              <Fragment key={line}>
+                {i > 0 ? <br /> : null}
+                {line}
+              </Fragment>
+            ))}
+          </p>
         ) : null}
         <Signature />
       </div>
