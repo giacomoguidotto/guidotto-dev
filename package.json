@@ -12,6 +12,7 @@
     "format": "biome format --write",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
+    "pack:showpiece": "bun run scripts/pack-showpiece.ts",
     "ci": "bun run lint && bun run typecheck && bun run build",
     "prepare": "husky"
   },
