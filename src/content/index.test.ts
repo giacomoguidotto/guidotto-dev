@@ -63,6 +63,14 @@ describe("hero", () => {
       "A love letter",
     ]);
   });
+
+  test("the display stanza reconciles with the canonical thesis sentence", () => {
+    // The visual lines (sighted readers) and the aria-label sentence (assistive
+    // tech) must never drift apart: the lines are the sentence split on its
+    // boundary periods, so rejoining them with ". " and a final "." must
+    // reproduce the canonical thesis exactly.
+    expect(`${content.hero.thesisLines.join(". ")}.`).toBe(content.hero.thesis);
+  });
 });
 
 describe("projects (the four grid peers)", () => {

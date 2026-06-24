@@ -499,14 +499,17 @@ body {
   transform: translateX(-50%);
 }
 
-/* ---------- portrait (touch): re-author the vitrine ----------
-   The landscape contact sheet collapses to slivers on a narrow portrait
-   viewport, so here we let three larger vessels (data-driven; the rest are
-   hidden) flank the thesis from their `--mob-*` placement, flatten the depth
-   blur so the few that remain stay legible, and let the thesis wrap instead of
-   clipping. Without a hover, a tap lights one vessel at a time (see Hero), so
-   the earned color is still reachable. */
-@media (max-width: 640px) {
+/* ---------- re-author the vitrine: portrait and short landscape ----------
+   The landscape contact sheet is placed in `%`/`vw`/`vh`, so it collapses to
+   slivers (and the nowrap thesis overflows) whenever the stage gets small in a
+   dimension: a narrow portrait phone, but also a short landscape phone (wide but
+   < ~480px tall), where the centred thesis and the tall `vh`-sized vessels would
+   otherwise overlap. Both reframe to the same re-author: three larger vessels
+   (data-driven; the rest hidden) flank the thesis from their `--mob-*`
+   placement, the depth blur flattens, and the thesis wraps instead of clipping.
+   Without a hover, a tap lights one vessel at a time (see Hero), so the earned
+   color is still reachable. */
+@media (max-width: 640px), (max-height: 480px) and (orientation: landscape) {
   .case {
     top: var(--mob-y, var(--y));
     left: var(--mob-x, var(--x));
@@ -552,11 +555,19 @@ body {
   }
 }
 
-/* ---------- reduced motion: freeze to poster frames ---------- */
+/* ---------- reduced motion: freeze to poster frames ----------
+   Every layer that animates on focus/hover/active is listed: the vessel and its
+   parallax/float, plus the bloom sub-layers (surface shadow, media tint, glass
+   rim, gloss sweep, tag) and the field wash. CONTEXT.md asks reduced-motion to
+   collapse ALL of it to static, so a partial list would still animate color. */
 @media (prefers-reduced-motion: reduce) {
   .case,
   .vessel,
+  .vessel__surface,
+  .vessel__media,
+  .vessel__glass,
   .vessel__sweep,
+  .vessel__tag,
   .field__tint {
     transition: none;
     animation: none;

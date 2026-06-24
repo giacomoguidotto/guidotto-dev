@@ -12,15 +12,15 @@
 // The vessels are a calm display case, not links: a vessel only earns color,
 // and the browsable links to the work live in the proof grid below. Real
 // per-project recordings replace the motif media as they land; the composition
-// is designed to read as intentional with a partial set. The contact CTA lives
-// in the lower-page contact slice, never the hero.
+// is designed to read as intentional with a partial set (a missing/renamed
+// content key simply drops that plane, never white-screens the route).
 //
-// Lighting follows the pointer. On a fine pointer the vessels glow on hover; on
-// a coarse (touch) pointer there is no hover, so a tap lights one vessel at a
+// Lighting follows the pointer, coordinated by VitrineStage (one vessel lit at a
+// time, one `--live-accent` write). On a fine pointer the vessels glow on hover;
+// on a coarse (touch) pointer there is no hover, so a tap lights one vessel at a
 // time (tap again to dim). Portrait also re-authors the geometry: each plane is
 // placed from CSS custom properties so the stylesheet can flank the thesis with
-// three larger, flattened tiles and hide the two deepest (see VitrineStage and
-// globals.css).
+// three larger, flattened tiles and hide the two deepest (see globals.css).
 
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
 import {
@@ -28,7 +28,7 @@ import {
   type PlaneSubject,
 } from "~/components/showcase/glass-vessel";
 import { ShowcaseRoot, useAccent } from "~/components/showcase/showcase-root";
-import { content, type Project } from "~/content";
+import { content } from "~/content";
 
 /** Absolute placement inside the field (landscape or portrait). */
 interface Placement {
@@ -38,30 +38,35 @@ interface Placement {
   y: string;
 }
 
-interface Plane extends Placement {
+/** A placement plus depth and the content key that fills it. */
+interface PlaneSpec extends Placement {
   depth: 1 | 2 | 3;
+  /** The content key (a project or the showpiece) that fills this plane. */
+  key: string;
   /** Portrait placement; absent means the plane is hidden on mobile. */
   mobile?: Placement;
+}
+
+interface Plane extends Omit<PlaneSpec, "key"> {
   subject: PlaneSubject;
 }
 
 const { showpiece, projects, hero } = content;
 
-const project = (key: string): Project => {
-  const found = projects.find((p) => p.key === key);
-  if (!found) {
-    throw new Error(`Unknown project: ${key}`);
-  }
-  return found;
-};
+// Resolve a plane's content by key. Returns undefined for an unknown key so a
+// renamed/removed subject drops just its plane instead of throwing at module
+// load and white-screening the whole route (the vitrine is designed to read
+// with a partial set).
+const subjectFor = (key: string): PlaneSubject | undefined =>
+  key === showpiece.key ? showpiece : projects.find((p) => p.key === key);
 
 // Cases hug the edges and leave a central band clear for the thesis. The three
 // planes with a `mobile` placement (the showpiece plus one warm and one cool
 // project, for accent variety) reframe to flank the thesis on portrait; the two
 // without it drop out so the small composition stays legible.
-const PLANES: Plane[] = [
+const PLANE_SPECS: PlaneSpec[] = [
   {
-    subject: showpiece,
+    key: showpiece.key,
     depth: 2,
     x: "4%",
     y: "13%",
@@ -69,16 +74,9 @@ const PLANES: Plane[] = [
     h: "34vh",
     mobile: { x: "27%", y: "4%", w: "46vw", h: "20vh" },
   },
+  { key: "orray", depth: 1, x: "6%", y: "55%", w: "21vw", h: "31vh" },
   {
-    subject: project("orray"),
-    depth: 1,
-    x: "6%",
-    y: "55%",
-    w: "21vw",
-    h: "31vh",
-  },
-  {
-    subject: project("scry"),
+    key: "scry",
     depth: 2,
     x: "73%",
     y: "9%",
@@ -87,7 +85,7 @@ const PLANES: Plane[] = [
     mobile: { x: "53%", y: "71%", w: "43vw", h: "21vh" },
   },
   {
-    subject: project("tempo"),
+    key: "tempo",
     depth: 3,
     x: "75%",
     y: "51%",
@@ -95,15 +93,13 @@ const PLANES: Plane[] = [
     h: "33vh",
     mobile: { x: "4%", y: "66%", w: "45vw", h: "22vh" },
   },
-  {
-    subject: project("ginevra"),
-    depth: 3,
-    x: "40%",
-    y: "5%",
-    w: "22vw",
-    h: "19vh",
-  },
+  { key: "ginevra", depth: 3, x: "40%", y: "5%", w: "22vw", h: "19vh" },
 ];
+
+const PLANES: Plane[] = PLANE_SPECS.flatMap(({ key, ...rest }) => {
+  const subject = subjectFor(key);
+  return subject ? [{ ...rest, subject }] : [];
+});
 
 export function Hero() {
   return (
@@ -129,33 +125,48 @@ export function Hero() {
   );
 }
 
-// VitrineStage renders the tint + vessels and owns the touch lit state. It lives
-// inside ShowcaseRoot so it can write `--live-accent` through the same channel
-// hover uses. On a fine pointer the vessels are hover-lit and this holds no
-// state; on a coarse pointer a tap toggles which single vessel is lit, blooming
-// its accent (tap the same one again to dim).
+// VitrineStage renders the tint + vessels and is the single coordinator for the
+// earned color: it owns `activeKey` (which one vessel is lit) and is the only
+// place that writes `--live-accent`, so hover and tap share one source of truth
+// and exactly one accent is ever live. It lives inside ShowcaseRoot to reach the
+// accent channel. On a fine pointer hover/focus set the lit key transiently; on
+// a coarse pointer a tap toggles it (tap the same one again to dim).
 function VitrineStage() {
   const accent = useAccent();
   const [coarse, setCoarse] = useState(false);
   const [activeKey, setActiveKey] = useState<string | null>(null);
 
+  // Track the primary pointer live, so a hybrid device (iPad + trackpad,
+  // Surface) that switches input mode flips between hover and tap.
   useEffect(() => {
-    setCoarse(window.matchMedia("(pointer: coarse)").matches);
+    const mql = window.matchMedia("(pointer: coarse)");
+    const sync = () => setCoarse(mql.matches);
+    sync();
+    mql.addEventListener("change", sync);
+    return () => mql.removeEventListener("change", sync);
   }, []);
 
+  // The single accent write: derive `--live-accent` from the lit key, set on
+  // activation and cleared on change / unmount. Keeping this in an effect (not
+  // inside the state updaters) leaves those updaters pure, so React can safely
+  // replay them under StrictMode / concurrency.
+  useEffect(() => {
+    if (!activeKey) {
+      return;
+    }
+    const lit = PLANES.find((plane) => plane.subject.key === activeKey);
+    if (!lit) {
+      return;
+    }
+    accent.set(lit.subject.accent);
+    return () => accent.clear();
+  }, [activeKey, accent]);
+
+  const activate = useCallback((key: string) => setActiveKey(key), []);
+  const release = useCallback(() => setActiveKey(null), []);
   const toggle = useCallback(
-    (plane: Plane) => {
-      setActiveKey((current) => {
-        const next = current === plane.subject.key ? null : plane.subject.key;
-        if (next) {
-          accent.set(plane.subject.accent);
-        } else {
-          accent.clear();
-        }
-        return next;
-      });
-    },
-    [accent]
+    (key: string) => setActiveKey((current) => (current === key ? null : key)),
+    []
   );
 
   return (
@@ -184,10 +195,11 @@ function VitrineStage() {
             }
           >
             <GlassVessel
-              active={plane.subject.key === activeKey}
+              active={coarse && plane.subject.key === activeKey}
               depth={plane.depth}
               interaction={coarse ? "tap" : "hover"}
-              onActivate={coarse ? () => toggle(plane) : undefined}
+              onActivate={coarse ? toggle : activate}
+              onDeactivate={release}
               shape="rect"
               subject={plane.subject}
             />
