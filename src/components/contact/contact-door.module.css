@@ -1,0 +1,359 @@
+/* Contact door — the CTA close (#7): one loud owned door, a quiet rail beneath.
+
+   Co-located module CSS, kept OUT of globals.css so this slice owns its own
+   surface and never merge-conflicts with the parallel hero / proof-grid slices.
+   It only READS the global design tokens (the stage tokens --stage-*, the warm
+   --ivory, the glass rim --glass-rim, the mono/display fonts); it never edits
+   them.
+
+   The door is a native <details>/<summary>: it opens with no JS. With JS it is
+   upgraded into a morph — the pill grows into a raised card and the label glides
+   from centre to corner via the View Transitions API (the .door surface carries
+   view-transition-name: contact-door, the label carries contact-label), while
+   the fields cascade in. Everything collapses to an instant show under
+   prefers-reduced-motion at the foot of this file. */
+
+/* the stage used by the standalone preview route (mirrors the hero field, but
+   grows with content instead of clipping to one viewport) */
+.stage {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 100svh;
+  padding: clamp(2rem, 8vh, 6rem) 1.5rem;
+  color: var(--ivory);
+  background: radial-gradient(
+    130% 105% at 50% 16%,
+    var(--stage-1) 0%,
+    var(--stage-2) 52%,
+    var(--stage-3) 100%
+  );
+}
+
+.contact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 32rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+/* ---------- the door: pill when closed, raised card when open ---------- */
+
+/* the .door element is the surface that morphs. Closed, it shrink-wraps the
+   summary into the single loud pill CTA; open, it grows to a raised card. The
+   border / background / radius all live here so the View Transition has one
+   element to interpolate. */
+.door {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  background: color-mix(in oklch, var(--ivory) 6%, transparent);
+  border: 1px solid color-mix(in oklch, var(--ivory) 38%, transparent);
+  border-radius: 999px;
+  transition:
+    border-color 0.4s ease,
+    background 0.4s ease,
+    box-shadow 0.4s ease;
+}
+
+.morph {
+  view-transition-name: contact-door;
+}
+
+.door[open] {
+  width: 100%;
+  background: color-mix(in oklch, var(--stage-1) 72%, transparent);
+  border-color: var(--glass-rim);
+  border-radius: 16px;
+  /* raised: the card lifts on a layered shadow instead of dimming the page,
+     so the space around it reads as "click out here to close". */
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in oklch, var(--ivory) 10%, transparent),
+    0 2px 6px -2px oklch(0 0 0 / 0.5),
+    0 22px 48px -16px oklch(0 0 0 / 0.62);
+}
+
+/* the clickable header. Closed it is the pill interior (centred); open it
+   becomes the card's top row with the label pinned to the start. */
+.summary {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.8rem 1.5rem;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.82rem;
+  color: var(--ivory);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  list-style: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.door:not([open]) .summary:hover {
+  color: color-mix(in oklch, var(--ivory) 100%, transparent);
+}
+
+.door:not([open]):hover {
+  background: color-mix(in oklch, var(--ivory) 10%, transparent);
+  border-color: color-mix(in oklch, var(--ivory) 62%, transparent);
+}
+
+.summary:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--ivory) 70%, transparent);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
+.door[open] .summary {
+  justify-content: flex-start;
+  padding: 1.7rem 1.7rem 0.7rem;
+  cursor: default;
+}
+
+.summaryDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  background: var(--ivory);
+  border-radius: 999px;
+  transition: opacity 0.25s ease;
+}
+
+/* Open, the dot leaves the layout entirely (not just fades) so the title sits
+   flush with the fields' left edge instead of being pushed in by dot + gap. */
+.door[open] .summaryDot {
+  display: none;
+}
+
+/* the travelling label — same node in both states, so the View Transition
+   slides it from the pill's centre to the card's top-left, where it cross-fades
+   from the small mono CTA into the card's serif title. */
+.label {
+  white-space: nowrap;
+}
+
+.morph .label {
+  view-transition-name: contact-label;
+}
+
+.door[open] .label {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.55rem;
+  color: var(--ivory);
+  letter-spacing: -0.01em;
+}
+
+/* ---------- the revealed form frame ---------- */
+
+.panel {
+  padding: 0 1.7rem 1.7rem;
+  text-align: left;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fieldLabel {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.66rem;
+  color: color-mix(in oklch, var(--ivory) 64%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 0.95rem;
+  color: var(--ivory);
+  background: color-mix(in oklch, var(--stage-deep) 55%, transparent);
+  border: 1px solid color-mix(in oklch, var(--ivory) 16%, transparent);
+  border-radius: 9px;
+  transition:
+    border-color 0.3s ease,
+    background 0.3s ease;
+}
+
+.textarea {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
+.input:focus,
+.textarea:focus {
+  outline: none;
+  background: color-mix(in oklch, var(--stage-deep) 70%, transparent);
+  border-color: color-mix(in oklch, var(--ivory) 42%, transparent);
+}
+
+.send {
+  align-self: stretch;
+  padding: 0.85rem 1.5rem;
+  margin-top: 0.2rem;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.78rem;
+  color: var(--stage-3);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  background: var(--ivory);
+  border: none;
+  border-radius: 999px;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.send:hover {
+  transform: translateY(-1px);
+}
+
+.send:disabled {
+  cursor: progress;
+  opacity: 0.55;
+  transform: none;
+}
+
+.confirmation {
+  margin: 0.6rem 0 0.2rem;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.05rem;
+  font-style: italic;
+  color: var(--ivory);
+}
+
+.error {
+  margin: 0;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  color: oklch(0.72 0.16 25);
+}
+
+/* honeypot: present in the DOM for bots, never seen or reached by a human */
+.honeypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  clip: rect(0 0 0 0);
+}
+
+/* ---------- the field cascade ----------
+   Each .reveal element rises into place on a delay set by its --reveal-index.
+   The stagger is deliberately wide so the fields arrive one at a time — name,
+   then email, then message, then send — like a sentence being written. On a
+   morph-capable client the whole cascade is held back by --reveal-base so the
+   card finishes growing before the first field lands; elsewhere it runs from
+   open (still a tidy succession, just no box morph). */
+@media (prefers-reduced-motion: no-preference) {
+  .door[open] .reveal {
+    animation: revealField 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(
+      var(--reveal-base, 0ms) +
+      var(--reveal-index, 0) *
+      150ms
+    );
+  }
+
+  .morph[open] {
+    --reveal-base: 520ms;
+  }
+
+  @keyframes revealField {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* The shared-element morph (::view-transition-group(contact-door|contact-label))
+   is tuned in globals.css: those pseudo-elements are document-level, not
+   scoped to this module, so they cannot live behind a local class here. */
+
+/* ---------- the quiet rail (icons only, "or find me here") ---------- */
+
+.rail {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1.3rem;
+}
+
+.railLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  color: color-mix(in oklch, var(--ivory) 60%, transparent);
+  border-radius: 999px;
+  transition:
+    color 0.3s ease,
+    background 0.3s ease;
+}
+
+.railLink:hover {
+  color: var(--ivory);
+  background: color-mix(in oklch, var(--ivory) 8%, transparent);
+}
+
+.railLink:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--ivory) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.railLinkDark {
+  color: color-mix(in oklch, var(--ivory) 26%, transparent);
+  cursor: not-allowed;
+}
+
+.railLinkDark:hover {
+  color: color-mix(in oklch, var(--ivory) 26%, transparent);
+  background: none;
+}
+
+.railIcon {
+  display: block;
+}
+
+/* ---------- reduced motion: instant show, no morph, no cascade ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .door,
+  .summary,
+  .summaryDot,
+  .close,
+  .send,
+  .railLink,
+  .input,
+  .textarea {
+    transition: none;
+  }
+
+  .send:hover {
+    transform: none;
+  }
+}
