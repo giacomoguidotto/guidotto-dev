@@ -186,16 +186,15 @@ body {
 /* ---------- the glass vessel ---------- */
 
 .case {
+  --w-min: 9rem;
   position: absolute;
-  /* placement + size come from per-plane custom properties so the stylesheet can
-     re-author portrait geometry without fighting inline styles. Width drives the
-     size and aspect-ratio fixes the height, so a vessel keeps its shape when the
-     viewport is resized instead of stretching as independent vw width / vh
-     height. */
   top: var(--y);
   left: var(--x);
-  width: var(--w);
+  width: clamp(var(--w-min), 40vw, var(--w));
   aspect-ratio: var(--ar);
+  /* center the vessel on its `--x`/`--y` point; kept on the standalone `translate`
+     property so it composes with the float animation's `transform` (below) */
+  translate: -50% -50%;
   /* the work breathing (content motion is allowed; chrome stays still) */
   animation: float 22s ease-in-out infinite;
 }
@@ -273,15 +272,27 @@ body {
   filter: blur(1.5px);
 }
 
-/* focus mechanic — one piece sharp + bloomed, others stay back */
+/* focus mechanic — one piece sharp + bloomed, others stay back. The bloom alone
+   is the *pointer* affordance; it is not a reliable focus indicator (it is subtle
+   and a focused vessel can sit amid overlapping siblings), so keyboard focus also
+   gets an explicit ring below. */
 .vessel:hover,
 .vessel:focus-visible,
 .vessel[data-active="true"] {
   --scale: 1.04;
   z-index: 5;
-  outline: none;
   opacity: 1;
   filter: none;
+}
+
+/* keyboard focus: a clear, high-contrast ring so the focused vessel is
+   unmistakable even when the converged vessels overlap (WCAG 2.4.7 / 2.4.11).
+   `:focus-visible` keeps it keyboard-only, so pointer taps stay clean. The ring
+   sits on the raised, un-blurred focused vessel (above), so it is never clipped
+   by a neighbour. */
+.vessel:focus-visible {
+  outline: 2px solid var(--ivory);
+  outline-offset: 4px;
 }
 
 /* clipped surface holds the inner layers so the gloss sweep can't bleed past the
@@ -516,9 +527,14 @@ body {
    the tapped one sharpens into focus (see Hero). */
 @media (max-width: 640px), (max-height: 480px) and (orientation: landscape) {
   .case {
+    /* the portrait composition is authored from the top-left corner (the
+       `--mob-*` placement), so drop the desktop center-anchoring here */
     top: var(--mob-y, var(--y));
     left: var(--mob-x, var(--x));
     width: var(--mob-w, var(--w));
+    /* the portrait composition is authored from the top-left corner (the
+       `--mob-*` placement), so drop the desktop center-anchoring here */
+    translate: 0 0;
     /* aspect-ratio is inherited from the base rule, so the height still derives
        from the shared `--ar` and the portrait tiles keep their shape too */
   }

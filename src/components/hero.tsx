@@ -32,9 +32,11 @@ import {
 import { ShowcaseRoot, useAccent } from "~/components/showcase/showcase-root";
 import { content } from "~/content";
 
-/** Position + width inside the field. The height is not given: it comes from
- *  `ar` (CSS aspect-ratio), so a vessel keeps its shape on resize instead of
- *  stretching as independent vw width / vh height. */
+/** Center position + a fixed width inside the field. The position is the
+ *  vessel's center (it is center-anchored in CSS), so on resize the vessels
+ *  converge toward the middle instead of one edge. The width is a fixed length
+ *  (rem), not a vw fraction, so a vessel keeps its dimensions on resize and only
+ *  moves; its height comes from `ar` (CSS aspect-ratio). */
 interface Placement {
   w: string;
   x: string;
@@ -48,7 +50,7 @@ interface PlaneSpec extends Placement {
   depth: 1 | 2 | 3;
   /** The content key (a project or the showpiece) that fills this plane. */
   key: string;
-  /** Portrait placement (position + width); absent means hidden on mobile. */
+  /** Portrait placement (top-left position + width); absent means hidden on mobile. */
   mobile?: Placement;
 }
 
@@ -65,10 +67,13 @@ const { showpiece, projects, hero } = content;
 const subjectFor = (key: string): PlaneSubject | undefined =>
   key === showpiece.key ? showpiece : projects.find((p) => p.key === key);
 
-// Two flanking clusters that leave a central band clear for the thesis, pulled
-// in from the far edges so the contact sheet reads as one grouped composition
-// rather than scattered corners. Each vessel is sized by width + `ar`, so it
-// holds its shape on resize. The three planes with a `mobile` placement (the
+// Two flanking clusters that leave a central band clear for the thesis. Each
+// vessel has a FIXED width (rem) and is anchored by its center (`x`/`y` are the
+// center, in % of the field): so on resize the vessels keep their dimensions and
+// simply slide closer together (the % centers converge) rather than stretching.
+// The fixed sizes are tuned so the clusters stay grouped without piling up; CSS
+// clamps the width down only in the final sliver before the portrait re-author,
+// as an anti-overlap safety. The three planes with a `mobile` placement (the
 // showpiece plus one warm and one cool project, for accent variety) reframe to
 // flank the thesis on portrait; the two without it drop out so the small
 // composition stays legible.
@@ -76,32 +81,32 @@ const PLANE_SPECS: PlaneSpec[] = [
   {
     key: showpiece.key,
     depth: 2,
-    x: "10%",
-    y: "15%",
-    w: "21vw",
+    x: "24%",
+    y: "33%",
+    w: "16.5rem",
     ar: "1.08",
     mobile: { x: "27%", y: "4%", w: "46vw" },
   },
-  { key: "orray", depth: 1, x: "12%", y: "53%", w: "19vw", ar: "1.08" },
+  { key: "orray", depth: 1, x: "23%", y: "69%", w: "15rem", ar: "1.08" },
   {
     key: "scry",
     depth: 2,
-    x: "67%",
-    y: "11%",
-    w: "21vw",
+    x: "74%",
+    y: "27%",
+    w: "16.5rem",
     ar: "1.24",
     mobile: { x: "53%", y: "71%", w: "43vw" },
   },
   {
     key: "tempo",
     depth: 3,
-    x: "69%",
-    y: "50%",
-    w: "19vw",
+    x: "73%",
+    y: "67%",
+    w: "15rem",
     ar: "1.02",
     mobile: { x: "4%", y: "66%", w: "45vw" },
   },
-  { key: "ginevra", depth: 3, x: "42%", y: "6%", w: "18vw", ar: "1.85" },
+  { key: "ginevra", depth: 3, x: "50%", y: "17%", w: "14.5rem", ar: "1.85" },
 ];
 
 const PLANES: Plane[] = PLANE_SPECS.flatMap(({ key, ...rest }) => {
