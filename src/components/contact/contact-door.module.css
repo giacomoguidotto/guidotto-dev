@@ -126,8 +126,10 @@
   transition: opacity 0.25s ease;
 }
 
+/* Open, the dot leaves the layout entirely (not just fades) so the title sits
+   flush with the fields' left edge instead of being pushed in by dot + gap. */
 .door[open] .summaryDot {
-  opacity: 0;
+  display: none;
 }
 
 /* the travelling label — same node in both states, so the View Transition
@@ -203,8 +205,8 @@
 }
 
 .send {
-  align-self: flex-start;
-  padding: 0.7rem 1.5rem;
+  align-self: stretch;
+  padding: 0.85rem 1.5rem;
   margin-top: 0.2rem;
   font-family: var(--font-mono), monospace;
   font-size: 0.78rem;
