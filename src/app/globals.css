@@ -187,6 +187,12 @@ body {
 
 .case {
   position: absolute;
+  /* placement comes from per-plane custom properties so the stylesheet can
+     re-author portrait geometry without fighting inline styles */
+  top: var(--y);
+  left: var(--x);
+  width: var(--w);
+  height: var(--h);
   /* the work breathing (content motion is allowed; chrome stays still) */
   animation: float 22s ease-in-out infinite;
 }
@@ -491,6 +497,54 @@ body {
   color: color-mix(in oklch, var(--ivory) 58%, transparent);
   letter-spacing: 0.3em;
   transform: translateX(-50%);
+}
+
+/* ---------- portrait (touch): re-author the vitrine ----------
+   The landscape contact sheet collapses to slivers on a narrow portrait
+   viewport, so here we let three larger vessels (data-driven; the rest are
+   hidden) flank the thesis from their `--mob-*` placement, soften the depth
+   blur so the few that remain stay legible small, and let the thesis wrap
+   instead of clipping. The ambient accent cycle (Hero) keeps one lead lit at a
+   time, so the earned color still breathes without a pointer. */
+@media (max-width: 640px) {
+  .case {
+    top: var(--mob-y, var(--y));
+    left: var(--mob-x, var(--x));
+    width: var(--mob-w, var(--w));
+    height: var(--mob-h, var(--h));
+  }
+
+  .case[data-mobile-hidden] {
+    display: none;
+  }
+
+  /* fewer, larger tiles read better unblurred; the active one still pops */
+  .vessel[data-depth="2"] {
+    opacity: 0.82;
+    filter: blur(2px);
+  }
+
+  .vessel[data-depth="1"] {
+    opacity: 0.95;
+    filter: blur(0.6px);
+  }
+
+  .vitrine__copy {
+    gap: 0.9rem;
+    width: 90vw;
+  }
+
+  .thesis {
+    font-size: clamp(1.5rem, 7vw, 2.4rem);
+    line-height: 1.18;
+    letter-spacing: 0;
+  }
+
+  /* let each sentence-group wrap (and balance) rather than overflow the field */
+  .thesis__line {
+    text-wrap: balance;
+    white-space: normal;
+  }
 }
 
 /* ---------- reduced motion: freeze to poster frames ---------- */

@@ -14,24 +14,38 @@
 // Real per-project recordings replace the motif media as they land; the
 // composition is designed to read as intentional with a partial set. The
 // contact CTA lives in the lower-page contact slice, never the hero.
+//
+// Portrait (touch) reframing: the landscape contact sheet does not survive a
+// narrow portrait viewport, and its whole reactivity is hover/pointer-driven,
+// so a tap can only navigate away. On mobile we therefore (1) place each plane
+// from CSS custom properties so the stylesheet can re-author portrait geometry,
+// (2) show three larger vessels framing the thesis and hide the two deepest,
+// and (3) run an ambient accent cycle so the earned-color mechanic still
+// breathes one lead at a time without a pointer. The cycle is touch-only and
+// freezes under reduced motion (see VitrineStage).
 
-import type { CSSProperties } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import {
   GlassVessel,
   type PlaneSubject,
 } from "~/components/showcase/glass-vessel";
-import { ShowcaseRoot } from "~/components/showcase/showcase-root";
+import { ShowcaseRoot, useAccent } from "~/components/showcase/showcase-root";
 import { content, type Project } from "~/content";
 
-interface Plane {
-  depth: 1 | 2 | 3;
+/** Absolute placement inside the field (landscape or portrait). */
+interface Placement {
   h: string;
-  /** Subject carries a repo URL, so the plane can link to the work. */
-  subject: PlaneSubject & { repoUrl: string };
   w: string;
-  /** Absolute placement inside the field; leaves a central band for the thesis. */
   x: string;
   y: string;
+}
+
+interface Plane extends Placement {
+  depth: 1 | 2 | 3;
+  /** Portrait placement; absent means the plane is hidden on mobile. */
+  mobile?: Placement;
+  /** Subject carries a repo URL, so the plane can link to the work. */
+  subject: PlaneSubject & { repoUrl: string };
 }
 
 const { showpiece, projects, hero } = content;
@@ -44,9 +58,20 @@ const project = (key: string): Project => {
   return found;
 };
 
-// Cases hug the edges and leave a central band clear for the thesis.
+// Cases hug the edges and leave a central band clear for the thesis. The three
+// planes with a `mobile` placement (the showpiece plus one warm and one cool
+// project, for accent variety) reframe to flank the thesis on portrait; the two
+// without it drop out so the small composition stays legible.
 const PLANES: Plane[] = [
-  { subject: showpiece, depth: 2, x: "4%", y: "13%", w: "23vw", h: "34vh" },
+  {
+    subject: showpiece,
+    depth: 2,
+    x: "4%",
+    y: "13%",
+    w: "23vw",
+    h: "34vh",
+    mobile: { x: "27%", y: "4%", w: "46vw", h: "20vh" },
+  },
   {
     subject: project("orray"),
     depth: 1,
@@ -62,6 +87,7 @@ const PLANES: Plane[] = [
     y: "9%",
     w: "23vw",
     h: "30vh",
+    mobile: { x: "53%", y: "71%", w: "43vw", h: "21vh" },
   },
   {
     subject: project("tempo"),
@@ -70,6 +96,7 @@ const PLANES: Plane[] = [
     y: "51%",
     w: "21vw",
     h: "33vh",
+    mobile: { x: "4%", y: "66%", w: "45vw", h: "22vh" },
   },
   {
     subject: project("ginevra"),
@@ -81,34 +108,15 @@ const PLANES: Plane[] = [
   },
 ];
 
+/** Planes that appear on portrait, in cycle order. */
+const MOBILE_PLANES = PLANES.filter((plane) => plane.mobile);
+
+const CYCLE_MS = 2600;
+
 export function Hero() {
   return (
     <ShowcaseRoot className="field vitrine">
-      <div className="field__tint" />
-
-      <div className="field__vessels">
-        {PLANES.map((plane) => (
-          <span
-            className="case"
-            key={plane.subject.key}
-            style={
-              {
-                left: plane.x,
-                top: plane.y,
-                width: plane.w,
-                height: plane.h,
-              } as CSSProperties
-            }
-          >
-            <GlassVessel
-              depth={plane.depth}
-              href={plane.subject.repoUrl}
-              shape="rect"
-              subject={plane.subject}
-            />
-          </span>
-        ))}
-      </div>
+      <VitrineStage />
 
       <div className="vignette" />
 
@@ -126,5 +134,79 @@ export function Hero() {
 
       <p className="scroll-baton">{hero.scrollBaton}</p>
     </ShowcaseRoot>
+  );
+}
+
+// VitrineStage renders the tint + vessels and owns the portrait ambient cycle.
+// It lives inside ShowcaseRoot so it can write `--live-accent` through the same
+// earned-color channel hover uses on desktop. On a coarse pointer (and only
+// when motion is allowed) it walks the mobile planes one at a time, marking each
+// active (its glass blooms, the field tint rises) and pushing its accent to the
+// root. On a fine pointer the effect bails immediately, so desktop hover is
+// untouched and there is no idle re-render.
+function VitrineStage() {
+  const accent = useAccent();
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    if (!(coarse && MOBILE_PLANES.length > 0) || reduce) {
+      return;
+    }
+    let i = 0;
+    const step = () => {
+      const plane = MOBILE_PLANES[i % MOBILE_PLANES.length];
+      setActiveKey(plane.subject.key);
+      accent.set(plane.subject.accent);
+      i += 1;
+    };
+    step();
+    const id = window.setInterval(step, CYCLE_MS);
+    return () => {
+      window.clearInterval(id);
+      accent.clear();
+      setActiveKey(null);
+    };
+  }, [accent]);
+
+  return (
+    <>
+      <div className="field__tint" />
+
+      <div className="field__vessels">
+        {PLANES.map((plane) => (
+          <span
+            className="case"
+            data-mobile-hidden={plane.mobile ? undefined : true}
+            key={plane.subject.key}
+            style={
+              {
+                "--x": plane.x,
+                "--y": plane.y,
+                "--w": plane.w,
+                "--h": plane.h,
+                ...(plane.mobile && {
+                  "--mob-x": plane.mobile.x,
+                  "--mob-y": plane.mobile.y,
+                  "--mob-w": plane.mobile.w,
+                  "--mob-h": plane.mobile.h,
+                }),
+              } as CSSProperties
+            }
+          >
+            <GlassVessel
+              active={plane.subject.key === activeKey}
+              depth={plane.depth}
+              href={plane.subject.repoUrl}
+              shape="rect"
+              subject={plane.subject}
+            />
+          </span>
+        ))}
+      </div>
+    </>
   );
 }
