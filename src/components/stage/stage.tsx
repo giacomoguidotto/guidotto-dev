@@ -196,6 +196,13 @@ function MotionStage() {
       stage.style.setProperty("--p", progress.toFixed(4));
       const inv = 1 - progress;
 
+      // While the cells overlap and are half-formed they are not real targets;
+      // hold the whole grid `inert` so it leaves the interaction tree for pointer
+      // and keyboard alike (pointer-events alone would still let a tab land on a
+      // link behind the haze). Released the moment the grid resolves.
+      const resolved = progress > RESOLVE_AT;
+      grid.toggleAttribute("inert", !resolved);
+
       for (const cell of morphCells) {
         const tx = (cell.fx * inv).toFixed(2);
         const ty = (cell.fy * inv).toFixed(2);
@@ -203,20 +210,19 @@ function MotionStage() {
         cell.el.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${sc})`;
         cell.el.style.opacity = (1 + (cell.opacity - 1) * inv).toFixed(3);
         cell.el.style.zIndex = inv > 0.001 ? String(cell.z) : "";
-        // The half-formed cells are not click targets until the grid resolves.
-        cell.el.style.pointerEvents = progress > RESOLVE_AT ? "" : "none";
+        cell.el.style.pointerEvents = resolved ? "" : "none";
       }
 
       if (showpiecePlane) {
-        // Two beats: a brief lift + brighten ("wait for me"), then a slide off the
-        // left of the stage with a fade tail (it leaves by moving, never popping).
+        // Two beats: a brief lift ("wait for me"), then a slide off the left of
+        // the stage with a fade tail (it leaves by moving, never popping). Kept
+        // transform/opacity-only so the settle never forces a repaint.
         const lift = smoothstep(0, 0.18, progress);
         const exit = smoothstep(0.2, 0.62, progress);
         const tx = -exit * window.innerWidth * 0.95;
         const ty = -lift * 16 - exit * 36;
         showpiecePlane.style.transform = `translate3d(${tx.toFixed(2)}px, ${ty.toFixed(2)}px, 0)`;
         showpiecePlane.style.opacity = (1 - exit).toFixed(3);
-        showpiecePlane.style.filter = `brightness(${(1 + lift * 0.12 - exit * 0.12).toFixed(3)})`;
       }
 
       // A hook for video media to freeze to its poster during the settle, then
@@ -271,6 +277,7 @@ function MotionStage() {
         cancelAnimationFrame(raf);
       }
       // Release the cells back to their natural grid state on unmount.
+      grid.removeAttribute("inert");
       for (const cell of morphCells) {
         cell.el.style.transform = "";
         cell.el.style.opacity = "";

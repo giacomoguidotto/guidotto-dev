@@ -176,8 +176,10 @@
 }
 
 /* keyboard focus during the contact-sheet phase would land on cells that are not
-   yet legible; the JS gates pointer-events off below the resolve threshold, and a
-   focused card pulls itself forward so its ring is never lost behind a neighbour. */
-.gridStage :focus-visible {
+   yet legible; the JS holds the grid inert below the resolve threshold, and once
+   resolved a focused card pulls its whole cell forward (the cell carries the FLIP
+   transform, so raising an inner element alone would not clear its neighbours) so
+   the focus ring is never lost behind an overlapping card. */
+.gridStage [data-key]:has(:focus-visible) {
   z-index: 6;
 }
