@@ -502,10 +502,10 @@ body {
 /* ---------- portrait (touch): re-author the vitrine ----------
    The landscape contact sheet collapses to slivers on a narrow portrait
    viewport, so here we let three larger vessels (data-driven; the rest are
-   hidden) flank the thesis from their `--mob-*` placement, soften the depth
-   blur so the few that remain stay legible small, and let the thesis wrap
-   instead of clipping. The ambient accent cycle (Hero) keeps one lead lit at a
-   time, so the earned color still breathes without a pointer. */
+   hidden) flank the thesis from their `--mob-*` placement, flatten the depth
+   blur so the few that remain stay legible, and let the thesis wrap instead of
+   clipping. Without a hover, a tap lights one vessel at a time (see Hero), so
+   the earned color is still reachable. */
 @media (max-width: 640px) {
   .case {
     top: var(--mob-y, var(--y));
@@ -518,15 +518,20 @@ body {
     display: none;
   }
 
-  /* fewer, larger tiles read better unblurred; the active one still pops */
-  .vessel[data-depth="2"] {
-    opacity: 0.82;
-    filter: blur(2px);
+  /* portrait flattens the depth-of-field: the few remaining tiles read as clean
+     glass, calm at rest, and only the chosen (tapped) one blooms. Keeping the
+     far tiles blurred here just looked broken on a small screen. */
+  .vessel[data-depth="1"],
+  .vessel[data-depth="2"],
+  .vessel[data-depth="3"] {
+    --scale: 1;
+    opacity: 0.72;
+    filter: none;
   }
 
-  .vessel[data-depth="1"] {
-    opacity: 0.95;
-    filter: blur(0.6px);
+  .vessel[data-active="true"] {
+    --scale: 1.04;
+    opacity: 1;
   }
 
   .vitrine__copy {
