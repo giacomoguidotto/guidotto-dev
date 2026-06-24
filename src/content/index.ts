@@ -13,7 +13,8 @@
 //   - Badges stay dark until there are real KPIs (the showpiece keeps its one
 //     `JOSS submitted` badge). Unsourced fields are `null`, never invented.
 
-/** Abstract per-project media kind (stand-in art today, real recordings later). */
+/** Per-project media key. Selects the project's logo today (one per project);
+ *  the same seam swaps to real recordings later. */
 export type Motif = "neural" | "topology" | "mobile" | "macwindow" | "gallery";
 
 export interface SiteContent {

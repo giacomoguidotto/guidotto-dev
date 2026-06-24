@@ -11,8 +11,8 @@
 // plane (it does not join the later 2x2 grid, but it is present in the hero).
 // The vessels are a calm display case, not links: a vessel only earns color,
 // and the browsable links to the work live in the proof grid below. Real
-// per-project recordings replace the motif media as they land; the composition
-// is designed to read as intentional with a partial set (a missing/renamed
+// per-project recordings replace the per-project logo media as they land; the
+// composition is designed to read as intentional with a partial set (a missing/renamed
 // content key simply drops that plane, never white-screens the route).
 //
 // Lighting follows the pointer, coordinated by VitrineStage (one vessel lit at a
@@ -76,7 +76,8 @@ const subjectFor = (key: string): PlaneSubject | undefined =>
 // as an anti-overlap safety. The three planes with a `mobile` placement (the
 // showpiece plus one warm and one cool project, for accent variety) reframe to
 // flank the thesis on portrait; the two without it drop out so the small
-// composition stays legible.
+// composition stays legible. Every plane is square (ar 1) because the media is
+// now a square app-icon logo: a non-square vessel would letterbox the tile.
 const PLANE_SPECS: PlaneSpec[] = [
   {
     key: showpiece.key,
@@ -84,17 +85,17 @@ const PLANE_SPECS: PlaneSpec[] = [
     x: "24%",
     y: "33%",
     w: "16.5rem",
-    ar: "1.08",
+    ar: "1",
     mobile: { x: "27%", y: "4%", w: "46vw" },
   },
-  { key: "orray", depth: 1, x: "23%", y: "69%", w: "15rem", ar: "1.08" },
+  { key: "orray", depth: 1, x: "23%", y: "69%", w: "15rem", ar: "1" },
   {
     key: "scry",
     depth: 2,
     x: "74%",
     y: "27%",
     w: "16.5rem",
-    ar: "1.24",
+    ar: "1",
     mobile: { x: "53%", y: "71%", w: "43vw" },
   },
   {
@@ -103,10 +104,10 @@ const PLANE_SPECS: PlaneSpec[] = [
     x: "73%",
     y: "67%",
     w: "15rem",
-    ar: "1.02",
+    ar: "1",
     mobile: { x: "4%", y: "66%", w: "45vw" },
   },
-  { key: "ginevra", depth: 3, x: "50%", y: "17%", w: "14.5rem", ar: "1.85" },
+  { key: "ginevra", depth: 3, x: "50%", y: "16%", w: "12.5rem", ar: "1" },
 ];
 
 const PLANES: Plane[] = PLANE_SPECS.flatMap(({ key, ...rest }) => {

@@ -316,34 +316,34 @@ body {
 .vessel__media {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 14%;
-  color: oklch(0.8 0.02 88);
-  background: radial-gradient(
-    120% 110% at 50% 30%,
-    color-mix(in oklch, var(--accent) 15%, oklch(0.13 0.018 258)) 0%,
-    oklch(0.09 0.012 260) 72%
-  );
-  transition:
-    color 0.5s ease,
-    background 0.5s ease;
+  /* full-bleed: the project's logo IS the tile, so the vessel's rounded glass
+     frame doubles as the icon's frame and there is a single rounded square (no
+     inner second frame). Each logo asset is opaque to its square edges — its own
+     squircle corners are filled with a blurred copy of the icon — so the vessel
+     can crop to its own (tighter) radius without revealing the backdrop. The
+     flat fill only shows for the instant before the image paints. */
+  background: oklch(0.13 0.012 260);
+  transition: filter 0.5s ease;
+}
+
+/* calm at rest, "plays" (brightens) when the vessel is lit — the same read as
+   the proof cards. Scoped to .vessel so it never compounds with a proof card's
+   own media filter (proof cards aren't .vessel elements). */
+.vessel .vessel__media {
+  filter: saturate(0.85) brightness(0.86);
 }
 
 .vessel:hover .vessel__media,
 .vessel:focus-visible .vessel__media,
 .vessel[data-active="true"] .vessel__media {
-  color: oklch(0.95 0.02 90);
-  background: radial-gradient(
-    120% 110% at 50% 30%,
-    color-mix(in oklch, var(--accent) 32%, oklch(0.13 0.018 258)) 0%,
-    oklch(0.09 0.012 260) 74%
-  );
+  filter: saturate(1.05) brightness(1.06);
 }
 
-.vessel__media .motif {
-  width: 100%;
-  height: auto;
+/* next/image fill child: the logo fills the vessel edge to edge (it is a square
+   tile in a square vessel, so cover neither crops meaningfully nor distorts).
+   The vessel's overflow:hidden + border-radius rounds it into one clean tile. */
+.vessel__logo {
+  object-fit: cover;
 }
 
 /* the "glass": rim light, top gloss, specular, inner shadow (token-driven) —

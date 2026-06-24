@@ -173,11 +173,12 @@
   box-shadow: 0 26px 80px -18px color-mix(in oklch, var(--c) 55%, transparent);
 }
 
-/* the media is ProjectMedia's motif (the intentional placeholder behind the
-   media seam). Sharp at rest (NO blur) but a touch calmer; when loud it
-   saturates / brightens (the "sharpen / play" read, done as a visual treatment
-   since real recordings are pending owner assets). The filter rides this local
-   wrapper so we never reach into ProjectMedia's own class names. */
+/* the media is ProjectMedia's project logo (the interim mark behind the media
+   seam until real recordings land). Sharp at rest (NO blur) but a touch calmer;
+   when loud it saturates / brightens (the "sharpen / play" read, done as a
+   visual treatment since real recordings are pending owner assets). The filter
+   rides this local wrapper so we never reach into ProjectMedia's own class
+   names. */
 .media {
   position: absolute;
   inset: 0;
