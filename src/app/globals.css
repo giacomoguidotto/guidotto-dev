@@ -533,3 +533,16 @@ body {
     animation: none;
   }
 }
+
+/* ---------- contact door morph (pairs with contact-door.module.css) ----------
+   The View Transitions API drives the pill -> raised-card morph and the
+   "Get in touch" label's glide from centre to corner. These ::view-transition
+   pseudo-elements are document-level (they cannot be scoped inside the contact
+   module), so the timing that matches the rest of the motion language lives
+   here. The named groups are minted only on morph-capable, motion-welcome
+   clients, so there is nothing to tune when the transition never runs. */
+::view-transition-group(contact-door),
+::view-transition-group(contact-label) {
+  animation-duration: 0.36s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
