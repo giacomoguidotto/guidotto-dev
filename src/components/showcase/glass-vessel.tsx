@@ -2,11 +2,11 @@
 
 // GlassVessel — a single piece of work under CSS-faked glass.
 //
-// Purely presentational: it never navigates and it owns no state. The browsable
-// links to the work live in the proof grid below the hero, so the vitrine stays
-// a calm display case, not a wall of outbound links. Glass is a frame (rim
-// light, gloss sweep, specular, inner shadow), never a lens that distorts the
-// media beneath it.
+// Purely presentational: it never navigates and it owns no lit state. The
+// browsable links to the work live in the proof grid below the hero, so the
+// vitrine stays a calm display case, not a wall of outbound links. Glass is a
+// frame (rim light, gloss sweep, specular, inner shadow), never a lens that
+// distorts the media beneath it.
 //
 // The vessel only ever earns color, and a single coordinator (VitrineStage)
 // decides which one is lit at a time and writes the root `--live-accent`. The
@@ -15,9 +15,12 @@
 //     blur reports release; the lit look is CSS-driven (:hover / :focus-visible)
 //     and transient.
 //   - "tap" (coarse pointer): hover does not exist, so a tap reports activation
-//     and the coordinator toggles `active`, which drives the lit look.
+//     and the coordinator keeps `active` set (a tap outside dismisses). Every tap
+//     also fires a short damped-spring press on the glass and replays the gloss
+//     sweep, so re-tapping an already-lit vessel still feels alive without
+//     toggling it off.
 
-import type { CSSProperties } from "react";
+import { type CSSProperties, useRef } from "react";
 import type { Motif } from "~/content";
 import { ProjectMedia } from "./project-media";
 
@@ -34,6 +37,25 @@ export interface PlaneSubject {
   label: string;
   motif: Motif;
 }
+
+// A damped harmonic press: the glass dips under the finger then springs back
+// with a small, decaying overshoot (the physics of a critically-ish underdamped
+// spring). Kept just above 1 at the peak so it never bleeds past the tile.
+const SPRING_PRESS: Keyframe[] = [
+  { transform: "scale(1)", offset: 0 },
+  { transform: "scale(0.92)", offset: 0.18 },
+  { transform: "scale(1.012)", offset: 0.48 },
+  { transform: "scale(0.996)", offset: 0.72 },
+  { transform: "scale(1.003)", offset: 0.88 },
+  { transform: "scale(1)", offset: 1 },
+];
+const SPRING_MS = 480;
+
+const SWEEP: Keyframe[] = [
+  { transform: "translateX(-130%)" },
+  { transform: "translateX(130%)" },
+];
+const SWEEP_MS = 850;
 
 export function GlassVessel({
   subject,
@@ -58,15 +80,35 @@ export function GlassVessel({
   onDeactivate?: () => void;
 }) {
   const tap = interaction === "tap";
+  const surfaceRef = useRef<HTMLSpanElement>(null);
+  const sweepRef = useRef<HTMLSpanElement>(null);
 
   const activate = () => onActivate?.(subject.key);
   const deactivate = () => onDeactivate?.();
+
+  // A tap always reactivates (the coordinator never toggles off), and replays
+  // the spring + gloss so re-tapping the lit vessel still feels alive. The CSS
+  // already sweeps when a vessel first becomes active, so only replay the sweep
+  // imperatively on a re-tap (when it is already active) to avoid doubling it.
+  const handleTap = () => {
+    activate();
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+    surfaceRef.current?.animate(SPRING_PRESS, {
+      duration: SPRING_MS,
+      easing: "ease-out",
+    });
+    if (active) {
+      sweepRef.current?.animate(SWEEP, { duration: SWEEP_MS, easing: "ease" });
+    }
+  };
 
   const vesselStyle = { "--accent": subject.accent } as CSSProperties;
 
   // A button in both modes (the vessel never navigates). On a fine pointer it
   // reports hover/focus and the lit look is CSS-driven; on a coarse pointer a
-  // tap reports activation and the coordinator toggles `active`.
+  // tap reports activation, springs, and the coordinator keeps `active`.
   return (
     <button
       aria-label={tap ? subject.label : `Focus ${subject.label}`}
@@ -74,17 +116,17 @@ export function GlassVessel({
       data-active={active}
       data-depth={depth}
       onBlur={tap ? undefined : deactivate}
-      onClick={tap ? activate : undefined}
+      onClick={tap ? handleTap : undefined}
       onFocus={tap ? undefined : activate}
       onPointerEnter={tap ? undefined : activate}
       onPointerLeave={tap ? undefined : deactivate}
       style={vesselStyle}
       type="button"
     >
-      <span className="vessel__surface">
+      <span className="vessel__surface" ref={surfaceRef}>
         <ProjectMedia motif={subject.motif} />
         <span className="vessel__glass" />
-        <span className="vessel__sweep" />
+        <span className="vessel__sweep" ref={sweepRef} />
       </span>
       <span className="vessel__tag">{subject.label}</span>
     </button>

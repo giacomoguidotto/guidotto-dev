@@ -225,7 +225,9 @@ body {
   margin: 0;
   color: var(--ivory);
   appearance: none;
-  cursor: pointer;
+  /* a display case, not a link: keep the default arrow, never the hand cursor
+     (the browsable links live in the proof grid below) */
+  cursor: default;
   background: transparent;
   border: none;
   border-radius: 1.4rem;
@@ -506,9 +508,9 @@ body {
    < ~480px tall), where the centred thesis and the tall `vh`-sized vessels would
    otherwise overlap. Both reframe to the same re-author: three larger vessels
    (data-driven; the rest hidden) flank the thesis from their `--mob-*`
-   placement, the depth blur flattens, and the thesis wraps instead of clipping.
-   Without a hover, a tap lights one vessel at a time (see Hero), so the earned
-   color is still reachable. */
+   placement, and the thesis wraps instead of clipping. The depth-of-field blur
+   is kept (same as the web): the vessels sit hidden behind their blur and only
+   the tapped one sharpens into focus (see Hero). */
 @media (max-width: 640px), (max-height: 480px) and (orientation: landscape) {
   .case {
     top: var(--mob-y, var(--y));
@@ -519,22 +521,6 @@ body {
 
   .case[data-mobile-hidden] {
     display: none;
-  }
-
-  /* portrait flattens the depth-of-field: the few remaining tiles read as clean
-     glass, calm at rest, and only the chosen (tapped) one blooms. Keeping the
-     far tiles blurred here just looked broken on a small screen. */
-  .vessel[data-depth="1"],
-  .vessel[data-depth="2"],
-  .vessel[data-depth="3"] {
-    --scale: 1;
-    opacity: 0.72;
-    filter: none;
-  }
-
-  .vessel[data-active="true"] {
-    --scale: 1.04;
-    opacity: 1;
   }
 
   .vitrine__copy {

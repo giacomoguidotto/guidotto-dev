@@ -18,9 +18,11 @@
 // Lighting follows the pointer, coordinated by VitrineStage (one vessel lit at a
 // time, one `--live-accent` write). On a fine pointer the vessels glow on hover;
 // on a coarse (touch) pointer there is no hover, so a tap lights one vessel at a
-// time (tap again to dim). Portrait also re-authors the geometry: each plane is
-// placed from CSS custom properties so the stylesheet can flank the thesis with
-// three larger, flattened tiles and hide the two deepest (see globals.css).
+// time and keeps it lit (re-tapping replays its spring; a tap outside dismisses)
+// while the rest stay hidden behind their depth blur. Portrait also re-authors
+// the geometry: each plane is placed from CSS custom properties so the
+// stylesheet can flank the thesis with three larger tiles and hide the two
+// deepest (see globals.css).
 
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
 import {
@@ -130,7 +132,9 @@ export function Hero() {
 // place that writes `--live-accent`, so hover and tap share one source of truth
 // and exactly one accent is ever live. It lives inside ShowcaseRoot to reach the
 // accent channel. On a fine pointer hover/focus set the lit key transiently; on
-// a coarse pointer a tap toggles it (tap the same one again to dim).
+// a coarse pointer a tap lights a vessel and keeps it lit (re-tapping the same
+// one just replays its spring, never dims it), and a tap anywhere outside the
+// vessels dismisses.
 function VitrineStage() {
   const accent = useAccent();
   const [coarse, setCoarse] = useState(false);
@@ -162,12 +166,25 @@ function VitrineStage() {
     return () => accent.clear();
   }, [activeKey, accent]);
 
+  // Touch dismissal: with no hover there is no "leave", so a tap that lands
+  // outside every vessel releases the lit one (a tap on a vessel is handled by
+  // its own click, and never reaches here as an outside tap).
+  useEffect(() => {
+    if (!(coarse && activeKey)) {
+      return;
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (!target?.closest(".vessel")) {
+        setActiveKey(null);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [coarse, activeKey]);
+
   const activate = useCallback((key: string) => setActiveKey(key), []);
   const release = useCallback(() => setActiveKey(null), []);
-  const toggle = useCallback(
-    (key: string) => setActiveKey((current) => (current === key ? null : key)),
-    []
-  );
 
   return (
     <>
@@ -198,7 +215,7 @@ function VitrineStage() {
               active={coarse && plane.subject.key === activeKey}
               depth={plane.depth}
               interaction={coarse ? "tap" : "hover"}
-              onActivate={coarse ? toggle : activate}
+              onActivate={activate}
               onDeactivate={release}
               shape="rect"
               subject={plane.subject}
