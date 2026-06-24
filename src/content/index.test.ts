@@ -87,7 +87,7 @@ describe("projects (the four grid peers)", () => {
     const accents = Object.fromEntries(
       content.projects.map((p) => [p.key, p.accent])
     );
-    expect(accents.orray).toBe("#2784D5");
+    expect(accents.orray).toBe("#E7E6E5");
     expect(accents.tempo).toBe("#C06730");
     expect(accents.scry).toBe("#5DE4C7");
     // Ginevra: assigned terracotta / warm-rose (CONTEXT locks the name, not a hex);
@@ -109,7 +109,7 @@ describe("projects (the four grid peers)", () => {
 
 describe("showpiece (AnyPINN)", () => {
   test("locked accent, single badge, repo, deferred story", () => {
-    expect(content.showpiece.accent).toBe("#22C55E");
+    expect(content.showpiece.accent).toBe("#9B99F0");
     expect(content.showpiece.badge).toBe("JOSS submitted");
     expect(content.showpiece.repoUrl).toBe(
       "https://github.com/giacomoguidotto/anypinn"

@@ -279,7 +279,7 @@ problem*: the network is handed **noisy scatter** and recovers the hidden trajec
 **The spectacle (`@react-three/fiber` + drei — the single WebGL spend):**
 
 - Noisy **observations rain in** as faint cool-white motes in 3D — the data the net sees.
-- The **learned field** is a glowing accent-green (`#22C55E`) tube threading the motes;
+- The **learned field** is a glowing green (`#22C55E`) tube threading the motes;
   at the initial snapshot it's a tangled stub, and as epochs replay it **uncurls and
   snaps into the butterfly**, additive bloom peaking at convergence (the one loud
   answer per the reactivity law), then easing back.
@@ -537,11 +537,13 @@ Sourced from each project's real material where one exists, **assigned** where t
 project is deliberately monochrome — assignment is honest (we don't fabricate a brand
 story; we pick a distinguishing color):
 
-- **AnyPINN** — green `#22C55E` (its real brand; also the showpiece attractor's color).
+- **AnyPINN** — periwinkle `#9B99F0` (the blue of its logo's wave). The showpiece
+  attractor keeps its own green (`#22C55E`); the project accent is the logo's blue, not
+  the attractor's green.
 - **Tempo** — copper `#C06730` ("Warm Analog", from the app).
 - **Scry** — mint `#5DE4C7` (from the app).
-- **Orray** — blue `#2784D5` — **assigned**. Orray's own palette is intentional B/W
-  (the surface wasn't a design focus yet), so we assign an accent rather than invent one.
+- **Orray** — white `#E7E6E5` — **sourced** from its logo's white ray. Orray's palette is
+  intentionally B/W, so its accent is that white rather than an assigned color.
 - **Ginevra Renier** — **terracotta / warm-rose** — **assigned**. Her site is
   deliberately high-contrast B/W; a literal color pulled from it (cream/ivory) would
   blend into our warm-white voice, so terracotta gives it a distinct bloom. Revisit if

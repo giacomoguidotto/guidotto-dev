@@ -177,7 +177,7 @@ export const content: Content = {
       tag: "Platform · Go · Kubernetes",
       onFocus:
         "Infrastructure you can finally see. A Go control plane and Kubernetes CRDs sit under a living canvas, so a cluster becomes a place you move through instead of a wall of dashboards. Still in early development.",
-      accent: "#2784D5",
+      accent: "#E7E6E5",
       repoUrl: "https://github.com/orray-proj/orray",
       motif: "topology",
     },
@@ -233,7 +233,7 @@ export const content: Content = {
       "Open-source physics-informed neural networks, grown from a funded thesis.",
     // v1: /stories/anypinn deferred -> the "see the story" link is hidden.
     storyHref: null,
-    accent: "#22C55E",
+    accent: "#9B99F0",
     repoUrl: "https://github.com/giacomoguidotto/anypinn",
     motif: "neural",
   },
