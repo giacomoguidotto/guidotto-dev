@@ -85,10 +85,28 @@
   transition: background 0.7s ease;
 }
 
-/* the depth-of-field "atmosphere" of the contact sheet. It cross-fades OUT on
-   --p (soft -> sharp) rather than animating any blur radius: animated blur is the
-   one costly thing, so the softness is a dimming vignette that lifts as the work
-   resolves from atmosphere into evidence. */
+/* the "develops like a photograph" softness. CONTEXT is explicit that the contact
+   sheet is BLURRED and resolves soft -> sharp, and equally explicit that animating
+   the blur RADIUS is the one costly thing. So this is the prescribed compromise: a
+   frosted scrim at a CONSTANT radius whose OPACITY cross-fades out on --p. The
+   radius never animates (no per-frame filter cost, no reflow); only the layer's
+   opacity rides 1 - --p, so the work behind the glass starts soft and sharpens into
+   evidence as the grid resolves. It sits above the cards / showpiece (z2) but below
+   the thesis (z4), so the work blurs while the message never does — exactly the
+   hero's "soft-focus behind glass" relationship, now released by scroll. */
+.frost {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: calc(1 - min(1, var(--p, 0) * 1.12));
+  -webkit-backdrop-filter: blur(var(--frost-radius, 13px));
+  backdrop-filter: blur(var(--frost-radius, 13px));
+}
+
+/* the depth-of-field "atmosphere" of the contact sheet: a dimming vignette layered
+   over the frost that deepens the corners so the soft work reads as recessed, then
+   lifts on --p as the work resolves from atmosphere into evidence. */
 .atmosphere {
   position: absolute;
   inset: 0;

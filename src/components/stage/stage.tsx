@@ -309,6 +309,9 @@ function MotionStage() {
             <GlassVessel depth={2} shape="rect" subject={showpiece} />
           </div>
 
+          {/* the constant-radius frosted glass: the work is soft behind it, and it
+              cross-fades out on --p (soft -> sharp) without animating the radius. */}
+          <div className={styles.frost} />
           <div className={styles.atmosphere} />
 
           <div className={styles.heroCopy}>
