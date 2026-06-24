@@ -16,7 +16,7 @@ export function Denouement() {
   return (
     <div className={styles.section}>
       <Mission />
-      <HumanAnchor />
+      <HumanAnchor portraitSrc="/portrait/giacomo.jpg" />
     </div>
   );
 }
