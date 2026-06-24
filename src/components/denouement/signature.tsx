@@ -15,7 +15,6 @@
 // `d` (and viewBox) is the only change the real trace needs.
 
 import { useEffect, useRef } from "react";
-import { content } from "~/content";
 import styles from "./denouement.module.css";
 
 // Duration of the one draw-on pass.
@@ -67,6 +66,13 @@ export function Signature() {
     if (reduced) {
       return;
     }
+    // If scroll-into-view cannot be observed, never arm. Arming hides the stroke,
+    // and without an observer to un-hide it the visitor would be left with a blank
+    // signature (worse than no motion). Bail to the finished mark instead. This
+    // guard must stay before the arming below.
+    if (typeof IntersectionObserver === "undefined") {
+      return;
+    }
     // Arm: hide the stroke with no transition, so nothing moves on its own until
     // the signature is scrolled into view.
     path.style.transition = "none";
@@ -86,7 +92,10 @@ export function Signature() {
       },
       { threshold: 0.45 }
     );
-    observer.observe(path);
+    // Observe the replaced <svg> root, not the inner <path>: intersection on SVG
+    // geometry children is unreliable across engines, and a missed callback is the
+    // same blank-signature failure mode the guard above protects against.
+    observer.observe(path.ownerSVGElement ?? path);
     return () => observer.disconnect();
   }, []);
 
@@ -97,7 +106,6 @@ export function Signature() {
       fill="none"
       viewBox="0 0 300 130"
     >
-      <title>{content.human.signature}</title>
       <path
         className={styles.signaturePath}
         d={SIGNATURE_PATH}

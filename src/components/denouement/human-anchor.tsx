@@ -10,14 +10,22 @@
 // in (passed as `portraitSrc`), it shows a quiet warm silhouette behind the same
 // vitrine glass the rest of the gallery uses, so the section reads as deliberate
 // with no asset present. Supplying a `portraitSrc` swaps the silhouette for the
-// real image in the identical frame, with no layout change.
+// real image in the identical frame, with no layout change. The real image stands
+// alone as the warm face this section pays off into, so its alt text defaults to
+// the canonical name (no invented copy) and can be overridden via `portraitAlt`.
 
 import Image from "next/image";
 import { content } from "~/content";
 import styles from "./denouement.module.css";
 import { Signature } from "./signature";
 
-export function HumanAnchor({ portraitSrc }: { portraitSrc?: string }) {
+export function HumanAnchor({
+  portraitSrc,
+  portraitAlt = content.site.name,
+}: {
+  portraitSrc?: string;
+  portraitAlt?: string;
+}) {
   const { personalLine } = content.human;
   return (
     <section className={styles.human}>
@@ -25,10 +33,10 @@ export function HumanAnchor({ portraitSrc }: { portraitSrc?: string }) {
         <span className={styles.portraitFill} />
         {portraitSrc ? (
           <Image
-            alt=""
+            alt={portraitAlt}
             className={styles.portraitImage}
             fill
-            sizes="(max-width: 40rem) 60vw, 13rem"
+            sizes="13rem"
             src={portraitSrc}
           />
         ) : (
