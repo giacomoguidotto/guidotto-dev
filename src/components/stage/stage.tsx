@@ -82,6 +82,14 @@ const RADIUS_REM = 1.4;
 // The hero's :hover / :focus scale bump, applied to a lit at-rest tile.
 const HOVER_SCALE = 1.04;
 
+// The hero's floating name tag (its .vessel__tag): a small mono label that fades in
+// under a lit vessel at rest. Like the blur + corner, its font size and offset live
+// in the poster's local space, so the stage divides them by the live FLIP scale so
+// the on-screen tag is exactly the hero's (0.6rem, 1.9rem below the vessel).
+const TAG_FONT_REM = 0.6;
+const TAG_OFFSET_REM = 1.9;
+const TAG_LIT_OPACITY = 0.95;
+
 const clamp = (value: number, lo: number, hi: number): number =>
   Math.min(Math.max(value, lo), hi);
 
@@ -166,6 +174,8 @@ interface Rig {
   readonly srcDx: number;
   readonly srcDy: number;
   readonly srcScale: number;
+  // The hero's floating name tag (rest-only), sized + offset against the live scale.
+  readonly tag: HTMLElement | null;
   readonly tgtDx: number;
   readonly tgtDy: number;
   readonly tgtScale: number;
@@ -233,6 +243,7 @@ const buildPeerRig = (
     srcDx: vCx - home.cx,
     srcDy: vCy - home.cy,
     srcScale: vW / home.w,
+    tag: child(el, "[data-tag]"),
     tgtDx: 0,
     tgtDy: 0,
     tgtScale: 1,
@@ -281,6 +292,7 @@ const buildShowRig = (
     srcDx: 0,
     srcDy: 0,
     srcScale: 1,
+    tag: child(el, "[data-tag]"),
     tgtDx: tgtCx - home.cx,
     tgtDy: tgtCy - home.cy,
     tgtScale: 1,
@@ -304,6 +316,14 @@ const drive = (rig: Rig, p: number, lit: boolean) => {
   rig.poster.style.filter =
     blur > 0.02 ? `blur(${(blur / scale).toFixed(2)}px)` : "none";
   rig.poster.style.borderRadius = `${(RADIUS_REM / scale).toFixed(3)}rem`;
+  // The floating name tag is the hero's, restored at rest: divide its size + offset by
+  // the live scale so it reads at the hero's pixel size, and reveal it only when this
+  // is the lit vessel at rest (`lit` is false the moment the morph leaves rest).
+  if (rig.tag) {
+    rig.tag.style.fontSize = `${(TAG_FONT_REM / scale).toFixed(3)}rem`;
+    rig.tag.style.bottom = `${(-TAG_OFFSET_REM / scale).toFixed(3)}rem`;
+    rig.tag.style.opacity = lit ? `${TAG_LIT_OPACITY}` : "0";
+  }
   if (rig.caption) {
     rig.caption.style.opacity = smoothstep(0.62, 0.96, p).toFixed(3);
   }
@@ -373,6 +393,11 @@ const restoreRig = (rig: Rig) => {
   rig.el.removeAttribute("data-active");
   rig.poster.style.filter = "";
   rig.poster.style.borderRadius = "";
+  if (rig.tag) {
+    rig.tag.style.fontSize = "";
+    rig.tag.style.bottom = "";
+    rig.tag.style.opacity = "";
+  }
   if (rig.caption) {
     rig.caption.style.opacity = "";
   }

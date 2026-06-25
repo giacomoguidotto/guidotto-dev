@@ -92,6 +92,14 @@ export function ProjectTile({ model }: { model: TileModel }) {
           <span className={proofStyles.glass} />
           <span className={proofStyles.sweep} />
         </span>
+        {/* the hero's floating name tag, restored at rest: it fades in under a
+            lit vessel exactly like the hero's .vessel__tag (every tile has one,
+            the showpiece included). The stage divides its size + offset by the
+            live FLIP scale so it renders at the hero's pixel size; a landed card
+            shows its in-flow caption below instead. */}
+        <span className={styles.restTag} data-tag>
+          {model.label}
+        </span>
       </span>
       {model.showpiece ? null : <TileCaption model={model} />}
     </a>

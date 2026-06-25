@@ -194,3 +194,30 @@
 .ready .tile[data-phase="rest"] [data-poster] {
   transition: filter 0.55s ease;
 }
+
+/* the hero's floating name tag, restored at rest: a small mono label that fades in
+   under a lit/hovered vessel exactly like the hero's .vessel__tag. It lives inside
+   the (scaled) poster, so the stage divides its font size + offset by the live FLIP
+   scale (set from JS, like the blur + corner) to render at the hero's pixel size.
+   It is a REST-only affordance — a landed card shows its in-flow caption instead —
+   so the stage drives its opacity to 0 the moment the morph leaves rest. The font
+   size + bottom are JS-driven; these are sane hero-sized fallbacks before first drive. */
+.restTag {
+  position: absolute;
+  bottom: -1.9rem;
+  left: 50%;
+  z-index: 4;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6rem;
+  color: color-mix(in oklch, var(--accent) 75%, var(--ivory));
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%);
+}
+
+.ready .tile[data-phase="rest"] .restTag {
+  transition: opacity 0.4s ease;
+}
