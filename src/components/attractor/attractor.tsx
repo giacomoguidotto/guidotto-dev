@@ -23,10 +23,28 @@
 // It lands fully standalone too (the finale must not depend on the loop): with no
 // handoff present the vessel simply rests in its slot.
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { ProjectMedia } from "~/components/showcase/project-media";
 import { content } from "~/content";
 import styles from "./attractor.module.css";
+
+// Force a deliberate line break after `marker`. This is a presentation-only
+// hand-break of the verbatim content string (like the hero's thesis stanza or the
+// human-anchor elaboration): the words are untouched, only where the line wraps.
+function hardBreak(text: string, marker: string): ReactNode {
+  const at = text.indexOf(marker);
+  if (at === -1) {
+    return text;
+  }
+  const cut = at + marker.length;
+  return (
+    <>
+      {text.slice(0, cut)}
+      <br />
+      {text.slice(cut).trimStart()}
+    </>
+  );
+}
 
 export function Attractor() {
   const { showpiece } = content;
@@ -76,10 +94,14 @@ export function Attractor() {
       </div>
 
       <div className={styles.footer}>
-        <p className={styles.caption}>{showpiece.caption}</p>
+        <p className={styles.caption}>
+          {hardBreak(showpiece.caption, "browser.")}
+        </p>
         {/* the footer ships the sentence alone — the "see the story" link is
             hidden at v1 (storyHref is null until a story page is sourced). */}
-        <p className={styles.footline}>{showpiece.footer}</p>
+        <p className={styles.footline}>
+          {hardBreak(showpiece.footer, "networks,")}
+        </p>
       </div>
     </section>
   );
