@@ -1,0 +1,250 @@
+/* Stage — the scroll handoff that ties the hero contact sheet to the proof grid
+   into one continuous scroll story (Option C: the showpiece is excluded from the
+   grid; it sets itself aside).
+
+   This is the SINGLE-DOM-NODE realisation of the handoff (see CONTEXT ->
+   "Decision (2026-06-25): one DOM node per project"). Each project is ONE <a>
+   (a ProjectTile) that is the vitrine vessel at rest and the proof card once
+   landed; this module styles the pinned scene the tiles morph across, and the
+   tiles themselves reuse the proof grid's own card CSS so the resolved 2x2 is
+   identical to the standalone grid.
+
+   Two presentations live behind the single <Stage /> interface:
+
+   - PLAIN (the default, and what reduced-motion / coarse-pointer / narrow / no-JS
+     always get): the existing <Hero /> then <ProofGrid /> as two stacked sections.
+     No styling here.
+
+   - MOTION (a progressive enhancement on motion-welcome fine pointers): one set of
+     tiles, parked in the vitrine contact sheet at rest and carried by transform /
+     opacity onto a centred 2x2 as a single scroll-progress --p advances. The depth
+     softness resolves through the poster's own filter:blur fading to none (never an
+     animated backdrop), and the chrome (thesis, baton, vignette, grain) hands the baton out.
+     Everything is transform / opacity only: GPU-composited, zero layout reflow. */
+
+/* The motion-mode scroll story. The stage grows with its content: a one-viewport
+   sticky CONTACT SHEET (the pin) and a sticky RESOLVED GRID stacked in the SAME first
+   viewport (the grid is pulled up over the pin with a negative margin). The grid is
+   BROWSER-PINNED (position: sticky) for the morph distance, so the morph is a pure
+   transform of viewport-fixed tiles — no per-frame JS scroll compensation, so no
+   compositor-vs-main-thread jitter. Once the morph completes the grid UN-STICKS and
+   scrolls with the page like any ordinary section, so it can be read all the way to
+   its end (the showpiece finale lands below it later). The stage's height is set from
+   JS to gridHeight + the morph distance, which is what makes the sticky release land
+   exactly on morph completion. The page scrolls freely throughout. */
+.stage {
+  position: relative;
+  color: var(--ivory);
+  /* the shared cool near-black-blue field carries on behind the in-flow grid once
+     the pinned contact sheet has scrolled away */
+  background: radial-gradient(
+    130% 60svh at 50% 8%,
+    var(--stage-1) 0%,
+    var(--stage-2) 52%,
+    var(--stage-3) 100%
+  );
+  isolation: isolate;
+}
+
+/* The contact sheet: one viewport tall, pinned for the first viewport of scroll. It
+   carries the chrome (tint, grain, vignette, thesis, baton) and the absolutely-placed
+   showpiece that sets itself aside; the four peer tiles are NOT here — they live in
+   the in-flow grid below and are only carried across this pinned frame by transform. */
+.pin {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: hidden;
+  color: var(--ivory);
+  /* the shared cool near-black-blue field of both the hero and the grid */
+  background: radial-gradient(
+    130% 105% at 50% 16%,
+    var(--stage-1) 0%,
+    var(--stage-2) 52%,
+    var(--stage-3) 100%
+  );
+  isolation: isolate;
+}
+
+/* The resolved 2x2's home. It is pulled UP over the pinned contact sheet by a
+   negative margin (cancelling the pin's one viewport of flow) so it shares the first
+   viewport, and is BROWSER-PINNED there (position: sticky; top: 0) for the morph. The
+   peer tiles morph across it by transform only, then — because the stage is exactly
+   gridHeight + morphDistance tall — the sticky RELEASES right as the morph completes
+   and the grid scrolls away naturally, so it reads to its end. Being browser-pinned
+   (not held in place by a JS scroll-compensating transform) is what removes the
+   handoff jitter. It sits above the pin so the tiles read over the contact-sheet
+   field during the morph. */
+.gridStick {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  /* cancel the pin's one viewport of normal flow so the grid shares the first
+     viewport with the contact sheet (the pin is height: 100svh) */
+  margin-top: -100svh;
+}
+
+/* the accent wash, shared by both states: it rides the one live --live-accent the
+   stage writes as a tile lights, exactly as the hero field tint and the grid tint
+   do (one lead at a time). */
+.tint {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 95% at 50% 38%,
+    color-mix(in oklch, var(--live-accent, transparent) 28%, transparent) 0%,
+    transparent 58%
+  );
+  transition: background 0.7s ease;
+}
+
+/* film grain over the field; it belongs to the contact sheet and fades out as the
+   sheet resolves into the (grainless) grid (opacity driven from JS on --p). */
+.grain {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: var(--grain);
+  mix-blend-mode: overlay;
+  opacity: 0.11;
+  will-change: opacity;
+}
+
+/* the vitrine layer that hosts the absolutely-placed showpiece tile (poster-only; it
+   never joins the grid, it sets itself aside below the viewport). It fills the pin. */
+.vitrine {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* the cool vignette that pools the contact sheet out of the field; it hands the
+   baton out (opacity driven from JS on --p) so it never darkens the resolved grid. */
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      120% 105% at 50% 40%,
+      transparent 44%,
+      color-mix(in oklch, var(--stage-deep) 84%, transparent) 100%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--stage-deep) 45%, transparent) 0%,
+      transparent 22%
+    );
+  will-change: opacity;
+}
+
+/* the centred thesis stanza floats over the contact sheet, then rises + fades as
+   the grid forms (transform / opacity driven from JS). It reuses the global
+   .vitrine__copy / .thesis typography, so this only sets the z-order + compositor
+   hint above that. */
+.copy {
+  z-index: 4;
+  will-change: transform, opacity;
+}
+
+.baton {
+  z-index: 4;
+  will-change: opacity;
+}
+
+/* ---- the tile (one <a> per project) ---- */
+
+/* A tile moves through three interactivity phases the stage writes as data-phase:
+     - rest:   a calm, hover-reactive display vessel (exactly like the hero vessel —
+               it earns colour on hover but never navigates), so the at-rest contact
+               sheet matches the hero 1:1;
+     - flight: inert mid-morph, so a half-formed card can't be clicked or lit;
+     - live:   a real, navigable proof card (href + interactivity restored).
+   The showpiece never reaches live (it sets itself aside), so it is only ever rest
+   or flight. */
+.tile {
+  pointer-events: none;
+  cursor: default;
+  will-change: transform, opacity;
+}
+
+/* At rest the vessel takes the pointer so it can light on hover; once live it is a
+   real link. The showpiece sits in the pointer-events:none vitrine layer, so its
+   own rest pointer-events:auto is what re-enables hover for it there. */
+.tile[data-phase="rest"],
+.tile[data-phase="live"] {
+  pointer-events: auto;
+}
+
+.tile[data-phase="live"] {
+  cursor: pointer;
+}
+
+/* a keyboard-focused, resolved card pulls its whole tile forward so the focus ring
+   is never lost behind an overlapping neighbour. */
+.tile:focus-visible {
+  z-index: 6;
+}
+
+/* a lit vessel (hovered at rest, or the resolved active card) rises above the
+   overlapping contact sheet, mirroring the hero's :hover z-index lift. */
+.tile[data-active="true"] {
+  z-index: 5;
+}
+
+/* Ease the AT-REST hover reaction (lift, blur-clear, recede) like the hero's 0.55s
+   glass response. Gated two ways so it eases ONLY the hover: `.ready` is added a
+   frame after mount, so the initial grid -> contact-sheet placement is instant (no
+   load-time fly-apart); and it is scoped to data-phase="rest", so the per-frame
+   scroll morph (flight) stays transition-free and never lags the scroll. */
+.ready .tile[data-phase="rest"] {
+  transition:
+    transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.55s ease;
+}
+
+/* the poster wears the depth blur directly (the hero's own filter: blur on the
+   content, not a backdrop veil — consistent across GPUs and far closer to the hero
+   read). The stage divides the blur + corner by the live scale so the on-screen
+   values are exactly the hero's; hint the compositor for the per-frame change. */
+.tile [data-poster] {
+  will-change: filter;
+}
+
+/* ease the at-rest hover sharpen (see above) — declared after the base poster rule
+   so specificity ascends. */
+.ready .tile[data-phase="rest"] [data-poster] {
+  transition: filter 0.55s ease;
+}
+
+/* the hero's floating name tag, restored at rest: a small mono label that fades in
+   under a lit/hovered vessel exactly like the hero's .vessel__tag. It lives inside
+   the (scaled) poster, so the stage divides its font size + offset by the live FLIP
+   scale (set from JS, like the blur + corner) to render at the hero's pixel size.
+   It is a REST-only affordance — a landed card shows its in-flow caption instead —
+   so the stage drives its opacity to 0 the moment the morph leaves rest. The font
+   size + bottom are JS-driven; these are sane hero-sized fallbacks before first drive. */
+.restTag {
+  position: absolute;
+  bottom: -1.9rem;
+  left: 50%;
+  z-index: 4;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6rem;
+  color: color-mix(in oklch, var(--accent) 75%, var(--ivory));
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%);
+}
+
+.ready .tile[data-phase="rest"] .restTag {
+  transition: opacity 0.4s ease;
+}

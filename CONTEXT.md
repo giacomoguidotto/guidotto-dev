@@ -243,6 +243,108 @@ morph → dissolve-and-reveal if janky → **`prefers-reduced-motion` always get
 plain sectioned version** (hero, then 2×2 grid, then showpiece finale; no morph, no
 set-aside).
 
+#### Decision (2026-06-25): one DOM node per project — the unified `ProjectTile`
+
+The "same DOM elements" mechanic above is realised literally: a project is **one
+`<a>` element** that *is* the vitrine vessel at rest and *is* the proof card once
+landed, never two elements that cross-fade. A single node can't be both the hero's
+non-navigating `<button>` and the card's `<a href>`, so the node is **one `<a>`**
+whose behaviour is swapped at the morph boundary (its `href` and click target are
+**absent at rest / during flight, present only once resolved**; pointer events are
+blocked mid-flight). The caption (title, weighted line, tag, on-focus copy, and the
+future "see the story" slot — dark until `storyHref` is sourced, see Showpiece) is
+always in the DOM and **assembles in** at the destination rather than dissolving.
+All five planes (the four peers + the showpiece) are `<a>` for DOM consistency; the
+showpiece is `href`-less throughout and sets itself aside as before. Soft → sharp
+is the hero's own depth treatment carried onto the tile: the poster wears a
+`filter: blur()` at the same per-depth radii the hero vessel uses, and the stage
+fades that blur to none (and tightens the corner from a rounder vitrine radius to
+the proof card's 1.4rem) across the morph.
+
+**Blur mechanism (2026-06-25, revises line 229).** The first cut used a
+constant-radius `backdrop-filter` veil whose opacity faded (to honour line 229's
+"don't animate the radius"). On the deployed preview that read visibly weaker and
+smeared than the hero, and `backdrop-filter` blur strength is GPU/compositor-
+dependent. The tile now blurs the **poster content** with `filter: blur()` (the
+hero's own, consistent mechanism) and **animates the radius** to none on landing.
+This is a deliberate, bounded reversal of line 229: it animates blur on ≤5
+GPU-composited tiles over a single one-shot scroll (the hero itself already
+transitions `filter: blur()` on hover), which is acceptable for the fidelity gain.
+
+**Rest fidelity + unified vessels (2026-06-25, supersedes the corner-morph and the
+bespoke showpiece set-aside above).** The first unified-tile cut diverged from the
+hero at rest in three ways: it scaled each peer tile down from its grid cell with
+`transform: scale()`, which shrank the rasterised `filter: blur()` and
+`border-radius` by that scale (blur read too soft, worst on the sharp foreground
+Orray; corners too tight); the showpiece sat at natural size with a *different*
+(2.4rem) corner; and the at-rest tiles dropped the hero's earn-colour-on-hover. The
+corrected rule is that **the at-rest tile matches `<Hero/>` 1:1**:
+- The corner is a **constant 1.4rem** (the hero vessel's and the proof card's shared
+  value); the earlier "rounder vitrine radius that tightens to 1.4rem" is dropped.
+- `drive()` **divides the blur radius and the corner by the live FLIP scale**, so the
+  on-screen blur is exactly the hero's per-depth radius (1.5 / 4 / 8px) and the
+  corner exactly 1.4rem no matter how far down a tile is scaled. The hero's per-depth
+  recede opacity and `--scale` are reproduced too (the depth scale folds into the
+  source size).
+- At rest the tiles are **hover-reactive like the hero vessels** (a hovered/focused
+  tile lifts, clears its blur, blooms its accent, and washes the field), driven
+  through the same single-lit coordinator that lights the resolved grid.
+
+And the **five vessels are now uniform**: every tile — the four peers and the AnyPINN
+showpiece — is one rig with a **source** (its vitrine scatter point + size) and a
+**target**, driven by the *same* `drive()` (no special-cased showpiece exit). Peers
+target their own grid cell (source = vitrine, target = cell) and resolve into
+navigable cards; the showpiece's DOM home *is* the contact sheet, so its source is
+identity and its **target is a point just below the grid, off-screen** — the
+curatorial set-aside, expressed as a plain target rather than a bespoke slide. That
+below-grid target is a **placeholder**: the finale (#9) retargets the showpiece onto
+the live attractor in the showpiece section instead of a card, by changing only its
+target.
+
+**Resolved grid is a browser-pinned sticky that releases (2026-06-25, supersedes the
+pinned-grid realisation above).** The first motion-stage cut placed the resolved 2×2
+*inside* the one-viewport pin (`position: absolute`, centred, `overflow: hidden`).
+Because the 2×2 is taller than one viewport (square posters + always-reserved on-focus
+caption space), its bottom row was clipped by the pin and **could never be scrolled
+into view** — the morph "completed" onto a grid whose end was unreachable,
+contradicting "then it's a normal scrollable grid" (line 240).
+
+A second cut moved the grid into **normal document flow** one viewport down and made
+each peer's morph *scroll-aware* (it eased the tile from a viewport-fixed scatter
+point to a constant landing point, compensating for the flow box's scroll every
+frame). That fixed reachability but introduced a **handoff jitter**: a flow element is
+moved by the compositor every scroll pixel, while the JS compensating transform lands
+a frame later — the two fight, so the morphing tiles visibly vibrate ("locked in place
+but trembling") during the handoff.
+
+The shipped realisation removes the scroll term entirely by letting the **browser** do
+the pinning. The pin still holds only the **contact-sheet chrome and the set-aside
+showpiece**; the **four peer tiles live in a `position: sticky` grid** that is pulled
+up over the pin (a `margin-top: -100svh` cancels the pin's viewport of flow) so it
+shares the first viewport:
+- The grid is **browser-pinned** (`top: 0`) for the morph, so each peer's cell sits at
+  a constant viewport point. The morph is then a **pure function of progress** — source
+  (vitrine scatter) → target (cell), both viewport-fixed, identical machinery to the
+  showpiece — with **no per-frame scroll compensation, hence no jitter**.
+- The stage's height is set from JS to `gridHeight + MORPH_END·viewport`, which is the
+  sticky stick-distance, so the grid **un-sticks exactly as the morph completes** and
+  then scrolls away as a plain section, read to its end (and on to the finale below) —
+  the "normal scrollable grid, not a journey" the handoff always promised. The sticky
+  release is continuous (no jump) because at the release scroll the pinned and flowed
+  positions coincide.
+- The showpiece's set-aside target is **just below the pinned viewport** (it never
+  references the grid); the finale (#9) still retargets it by changing only that target.
+
+**Ownership note / integration contract.** This unified tile deliberately crosses
+the old per-slice file-ownership boundary (it supersedes the separate `GlassVessel`
+`<button>` hero and `ProofCard` `<a>` grid). It currently lives **only behind
+`/preview/stage`** so the live homepage and the standalone `/preview/hero` +
+`/preview/proof-grid` are untouched for now — **but this `ProjectTile` motion stage
+is the canonical, final hero + grid.** The integration slice that wires the homepage
+**must adopt this**, not rebuild the old two-node hero/grid. The plain
+(reduced-motion / coarse / narrow / no-JS) fallback still composes the existing
+`<Hero />` + `<ProofGrid />`; integration may later re-home those onto the same tile.
+
 ### Showpiece — "The Attractor" (AnyPINN · Lorenz)
 
 The crown jewel is **AnyPINN solving the Lorenz system live in WebGL**, presented as
