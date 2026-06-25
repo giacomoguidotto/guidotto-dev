@@ -2,33 +2,30 @@
    into one continuous scroll story (Option C: the showpiece is excluded from the
    grid; it sets itself aside).
 
-   Co-located module CSS, kept OUT of globals.css so this Wave-2 slice owns its
-   own surface and never edits the shared token base. It only READS the global
-   design tokens (the stage tokens --stage-*, the warm --ivory, and the earned-
-   color --live-accent); it never edits them, and it styles only its own two
-   layers — the composed <Hero /> and <ProofGrid /> keep their own surfaces.
+   This is the SINGLE-DOM-NODE realisation of the handoff (see CONTEXT ->
+   "Decision (2026-06-25): one DOM node per project"). Each project is ONE <a>
+   (a ProjectTile) that is the vitrine vessel at rest and the proof card once
+   landed; this module styles the pinned scene the tiles morph across, and the
+   tiles themselves reuse the proof grid's own card CSS so the resolved 2x2 is
+   identical to the standalone grid.
 
    Two presentations live behind the single <Stage /> interface:
 
    - PLAIN (the default, and what reduced-motion / coarse-pointer / narrow / no-JS
-     always get): the hero, then the 2x2 grid, as two stacked sections, composed
-     from the already-verified <Hero /> and <ProofGrid /> directly. No styling here.
+     always get): the existing <Hero /> then <ProofGrid /> as two stacked sections.
+     No styling here.
 
-   - MOTION (a progressive enhancement on motion-welcome fine pointers): the
-     curated <Hero /> is the at-rest contact sheet (the initial frame is pixel-
-     identical to the standalone hero), stacked over the real <ProofGrid />. A
-     sticky pin holds the stage for ~one viewport of free scrolling (a visual pin,
-     never a scroll-lock or scroll-jack). A single scroll-progress property --p,
-     plus a JS FLIP that carries the hero's own vitrine vessels onto the grid cards,
-     drives the handoff: the hero layer cross-fades OUT (soft -> sharp comes for
-     free, because the hero's blurred depth-led vessels give way to the sharp grid
-     cards) while the grid layer cross-fades IN. Everything is transform / opacity
-     only, so the morph is GPU-composited with zero layout reflow. */
+   - MOTION (a progressive enhancement on motion-welcome fine pointers): one set of
+     tiles, parked in the vitrine contact sheet at rest and carried by transform /
+     opacity onto a centred 2x2 as a single scroll-progress --p advances. The depth
+     softness resolves through a constant-radius veil whose OPACITY fades (never its
+     radius), and the chrome (thesis, baton, vignette, grain) hands the baton out.
+     Everything is transform / opacity only: GPU-composited, zero layout reflow. */
 
-/* The motion-mode scroll track: ~two viewports tall. Its first viewport of
-   scrolling drives the morph (with a short hold at the end so the resolved grid
-   reads as a normal grid before the page continues); the pin keeps the stage in
-   view meanwhile. The page scrolls freely the whole time. */
+/* The motion-mode scroll track: ~two viewports tall. Its first viewport drives the
+   morph (with a short hold at the end so the resolved grid reads as a normal grid
+   before the page continues); the pin keeps the scene in view meanwhile. The page
+   scrolls freely the whole time. */
 .stage {
   position: relative;
   height: 200svh;
@@ -39,45 +36,8 @@
   top: 0;
   height: 100svh;
   overflow: hidden;
-  /* a base of the same cool near-black-blue field, so the brief cross-fade window
-     between the two full-bleed layers never reveals a gap */
-  background: radial-gradient(
-    130% 105% at 50% 16%,
-    var(--stage-1) 0%,
-    var(--stage-2) 52%,
-    var(--stage-3) 100%
-  );
-  isolation: isolate;
-}
-
-/* the at-rest layer: the real, curated <Hero /> (its own field, vitrine vessels,
-   vignette, thesis, baton). It cross-fades out as the handoff begins; its vessels
-   are carried onto the grid by JS transforms on top of this fade. */
-.heroLayer {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  will-change: opacity;
-}
-
-/* the resolved layer: the real <ProofGrid /> on its own cool stage, cross-faded
-   up beneath the travelling vessels (opacity is driven from JS on --p). */
-.gridLayer {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  opacity: 0;
-  will-change: opacity;
-}
-
-/* the grid's stage (mirrors proof-grid's own stage field) plus vertical centring,
-   so the resolved 2x2 sits centred in the pinned viewport. */
-.gridStage {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
   color: var(--ivory);
+  /* the shared cool near-black-blue field of both the hero and the grid */
   background: radial-gradient(
     130% 105% at 50% 16%,
     var(--stage-1) 0%,
@@ -87,9 +47,9 @@
   isolation: isolate;
 }
 
-/* accent bloom — once the morph resolves, the grid's single-active-card
-   coordinator writes --live-accent, and the field washes toward that one accent
-   (one lead at a time), exactly as it does in the standalone grid. */
+/* the accent wash, shared by both states: it rides the one live --live-accent the
+   stage writes as a tile lights, exactly as the hero field tint and the grid tint
+   do (one lead at a time). */
 .tint {
   position: absolute;
   inset: 0;
@@ -97,16 +57,110 @@
   pointer-events: none;
   background: radial-gradient(
     120% 95% at 50% 38%,
-    color-mix(in oklch, var(--live-accent, transparent) 26%, transparent) 0%,
+    color-mix(in oklch, var(--live-accent, transparent) 28%, transparent) 0%,
     transparent 58%
   );
   transition: background 0.7s ease;
 }
 
-/* keyboard focus during the handoff would land on cards that are not yet legible;
-   the JS holds the grid inert below the resolve threshold, and once resolved a
-   focused card pulls its whole cell forward so the focus ring is never lost behind
-   an overlapping card. */
-.gridStage [data-key]:has(:focus-visible) {
+/* film grain over the field; it belongs to the contact sheet and fades out as the
+   sheet resolves into the (grainless) grid (opacity driven from JS on --p). */
+.grain {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: var(--grain);
+  mix-blend-mode: overlay;
+  opacity: 0.11;
+  will-change: opacity;
+}
+
+/* the resolved 2x2's DOM home (the four peer tiles live here, in grid flow) and the
+   vitrine layer that hosts the absolutely-placed showpiece tile (poster-only; it
+   never joins the grid, it sets itself aside). Both fill the pin and centre their
+   contents. */
+.gridHome {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+}
+
+.vitrine {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* the cool vignette that pools the contact sheet out of the field; it hands the
+   baton out (opacity driven from JS on --p) so it never darkens the resolved grid. */
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      120% 105% at 50% 40%,
+      transparent 44%,
+      color-mix(in oklch, var(--stage-deep) 84%, transparent) 100%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--stage-deep) 45%, transparent) 0%,
+      transparent 22%
+    );
+  will-change: opacity;
+}
+
+/* the centred thesis stanza floats over the contact sheet, then rises + fades as
+   the grid forms (transform / opacity driven from JS). It reuses the global
+   .vitrine__copy / .thesis typography, so this only sets the z-order + compositor
+   hint above that. */
+.copy {
+  z-index: 4;
+  will-change: transform, opacity;
+}
+
+.baton {
+  z-index: 4;
+  will-change: opacity;
+}
+
+/* ---- the tile (one <a> per project) ---- */
+
+/* A tile is a non-navigating display vessel until the morph resolves it: the stage
+   removes its href and pointer events at rest / in flight, and restores both (via
+   data-live) once it is a real, legible card. */
+.tile {
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.tile[data-live="true"] {
+  pointer-events: auto;
+}
+
+/* a keyboard-focused, resolved card pulls its whole tile forward so the focus ring
+   is never lost behind an overlapping neighbour. */
+.tile:focus-visible {
   z-index: 6;
+}
+
+/* the depth veil: a CONSTANT-radius blur (per-tile --vb, set by depth) whose
+   OPACITY the stage fades from 1 (soft contact sheet) to 0 (sharp card). Fading a
+   fixed-radius backdrop blur is the cheap "develops like a photograph" soft ->
+   sharp, with no animated blur radius (CONTEXT line 229). */
+.veil {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  border-radius: inherit;
+  -webkit-backdrop-filter: blur(var(--vb, 0));
+  backdrop-filter: blur(var(--vb, 0));
+  will-change: opacity;
 }

@@ -243,6 +243,32 @@ morph → dissolve-and-reveal if janky → **`prefers-reduced-motion` always get
 plain sectioned version** (hero, then 2×2 grid, then showpiece finale; no morph, no
 set-aside).
 
+#### Decision (2026-06-25): one DOM node per project — the unified `ProjectTile`
+
+The "same DOM elements" mechanic above is realised literally: a project is **one
+`<a>` element** that *is* the vitrine vessel at rest and *is* the proof card once
+landed, never two elements that cross-fade. A single node can't be both the hero's
+non-navigating `<button>` and the card's `<a href>`, so the node is **one `<a>`**
+whose behaviour is swapped at the morph boundary (its `href` and click target are
+**absent at rest / during flight, present only once resolved**; pointer events are
+blocked mid-flight). The caption (title, weighted line, tag, on-focus copy, and the
+future "see the story" slot — dark until `storyHref` is sourced, see Showpiece) is
+always in the DOM and **assembles in** at the destination rather than dissolving.
+All five planes (the four peers + the showpiece) are `<a>` for DOM consistency; the
+showpiece is `href`-less throughout and sets itself aside as before. Soft → sharp is
+kept without animating a blur **radius** (CONTEXT line 229): each tile carries a
+constant-radius depth veil whose **opacity** fades as the poster sharpens.
+
+**Ownership note / integration contract.** This unified tile deliberately crosses
+the old per-slice file-ownership boundary (it supersedes the separate `GlassVessel`
+`<button>` hero and `ProofCard` `<a>` grid). It currently lives **only behind
+`/preview/stage`** so the live homepage and the standalone `/preview/hero` +
+`/preview/proof-grid` are untouched for now — **but this `ProjectTile` motion stage
+is the canonical, final hero + grid.** The integration slice that wires the homepage
+**must adopt this**, not rebuild the old two-node hero/grid. The plain
+(reduced-motion / coarse / narrow / no-JS) fallback still composes the existing
+`<Hero />` + `<ProofGrid />`; integration may later re-home those onto the same tile.
+
 ### Showpiece — "The Attractor" (AnyPINN · Lorenz)
 
 The crown jewel is **AnyPINN solving the Lorenz system live in WebGL**, presented as
