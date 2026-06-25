@@ -301,6 +301,40 @@ below-grid target is a **placeholder**: the finale (#9) retargets the showpiece 
 the live attractor in the showpiece section instead of a card, by changing only its
 target.
 
+**Resolved grid is a browser-pinned sticky that releases (2026-06-25, supersedes the
+pinned-grid realisation above).** The first motion-stage cut placed the resolved 2×2
+*inside* the one-viewport pin (`position: absolute`, centred, `overflow: hidden`).
+Because the 2×2 is taller than one viewport (square posters + always-reserved on-focus
+caption space), its bottom row was clipped by the pin and **could never be scrolled
+into view** — the morph "completed" onto a grid whose end was unreachable,
+contradicting "then it's a normal scrollable grid" (line 240).
+
+A second cut moved the grid into **normal document flow** one viewport down and made
+each peer's morph *scroll-aware* (it eased the tile from a viewport-fixed scatter
+point to a constant landing point, compensating for the flow box's scroll every
+frame). That fixed reachability but introduced a **handoff jitter**: a flow element is
+moved by the compositor every scroll pixel, while the JS compensating transform lands
+a frame later — the two fight, so the morphing tiles visibly vibrate ("locked in place
+but trembling") during the handoff.
+
+The shipped realisation removes the scroll term entirely by letting the **browser** do
+the pinning. The pin still holds only the **contact-sheet chrome and the set-aside
+showpiece**; the **four peer tiles live in a `position: sticky` grid** that is pulled
+up over the pin (a `margin-top: -100svh` cancels the pin's viewport of flow) so it
+shares the first viewport:
+- The grid is **browser-pinned** (`top: 0`) for the morph, so each peer's cell sits at
+  a constant viewport point. The morph is then a **pure function of progress** — source
+  (vitrine scatter) → target (cell), both viewport-fixed, identical machinery to the
+  showpiece — with **no per-frame scroll compensation, hence no jitter**.
+- The stage's height is set from JS to `gridHeight + MORPH_END·viewport`, which is the
+  sticky stick-distance, so the grid **un-sticks exactly as the morph completes** and
+  then scrolls away as a plain section, read to its end (and on to the finale below) —
+  the "normal scrollable grid, not a journey" the handoff always promised. The sticky
+  release is continuous (no jump) because at the release scroll the pinned and flowed
+  positions coincide.
+- The showpiece's set-aside target is **just below the pinned viewport** (it never
+  references the grid); the finale (#9) still retargets it by changing only that target.
+
 **Ownership note / integration contract.** This unified tile deliberately crosses
 the old per-slice file-ownership boundary (it supersedes the separate `GlassVessel`
 `<button>` hero and `ProofCard` `<a>` grid). It currently lives **only behind

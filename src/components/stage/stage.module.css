@@ -22,15 +22,34 @@
      animated backdrop), and the chrome (thesis, baton, vignette, grain) hands the baton out.
      Everything is transform / opacity only: GPU-composited, zero layout reflow. */
 
-/* The motion-mode scroll track: ~two viewports tall. Its first viewport drives the
-   morph (with a short hold at the end so the resolved grid reads as a normal grid
-   before the page continues); the pin keeps the scene in view meanwhile. The page
-   scrolls freely the whole time. */
+/* The motion-mode scroll story. The stage grows with its content: a one-viewport
+   sticky CONTACT SHEET (the pin) and a sticky RESOLVED GRID stacked in the SAME first
+   viewport (the grid is pulled up over the pin with a negative margin). The grid is
+   BROWSER-PINNED (position: sticky) for the morph distance, so the morph is a pure
+   transform of viewport-fixed tiles — no per-frame JS scroll compensation, so no
+   compositor-vs-main-thread jitter. Once the morph completes the grid UN-STICKS and
+   scrolls with the page like any ordinary section, so it can be read all the way to
+   its end (the showpiece finale lands below it later). The stage's height is set from
+   JS to gridHeight + the morph distance, which is what makes the sticky release land
+   exactly on morph completion. The page scrolls freely throughout. */
 .stage {
   position: relative;
-  height: 200svh;
+  color: var(--ivory);
+  /* the shared cool near-black-blue field carries on behind the in-flow grid once
+     the pinned contact sheet has scrolled away */
+  background: radial-gradient(
+    130% 60svh at 50% 8%,
+    var(--stage-1) 0%,
+    var(--stage-2) 52%,
+    var(--stage-3) 100%
+  );
+  isolation: isolate;
 }
 
+/* The contact sheet: one viewport tall, pinned for the first viewport of scroll. It
+   carries the chrome (tint, grain, vignette, thesis, baton) and the absolutely-placed
+   showpiece that sets itself aside; the four peer tiles are NOT here — they live in
+   the in-flow grid below and are only carried across this pinned frame by transform. */
 .pin {
   position: sticky;
   top: 0;
@@ -45,6 +64,24 @@
     var(--stage-3) 100%
   );
   isolation: isolate;
+}
+
+/* The resolved 2x2's home. It is pulled UP over the pinned contact sheet by a
+   negative margin (cancelling the pin's one viewport of flow) so it shares the first
+   viewport, and is BROWSER-PINNED there (position: sticky; top: 0) for the morph. The
+   peer tiles morph across it by transform only, then — because the stage is exactly
+   gridHeight + morphDistance tall — the sticky RELEASES right as the morph completes
+   and the grid scrolls away naturally, so it reads to its end. Being browser-pinned
+   (not held in place by a JS scroll-compensating transform) is what removes the
+   handoff jitter. It sits above the pin so the tiles read over the contact-sheet
+   field during the morph. */
+.gridStick {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  /* cancel the pin's one viewport of normal flow so the grid shares the first
+     viewport with the contact sheet (the pin is height: 100svh) */
+  margin-top: -100svh;
 }
 
 /* the accent wash, shared by both states: it rides the one live --live-accent the
@@ -76,18 +113,8 @@
   will-change: opacity;
 }
 
-/* the resolved 2x2's DOM home (the four peer tiles live here, in grid flow) and the
-   vitrine layer that hosts the absolutely-placed showpiece tile (poster-only; it
-   never joins the grid, it sets itself aside). Both fill the pin and centre their
-   contents. */
-.gridHome {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-}
-
+/* the vitrine layer that hosts the absolutely-placed showpiece tile (poster-only; it
+   never joins the grid, it sets itself aside below the viewport). It fills the pin. */
 .vitrine {
   position: absolute;
   inset: 0;

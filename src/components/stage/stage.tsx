@@ -154,14 +154,19 @@ const SHOWPIECE_MODEL: TileModel = {
   showpiece: true,
 };
 
-// One tile measured for the morph. Every vessel — peer or showpiece — is this same
-// shape: a SOURCE (vitrine) and a TARGET expressed as the poster centre's offset
-// from the tile's DOM home (px) plus a scale relative to the home poster width. The
-// morph lerps src -> tgt:
-//   - peers home in the grid, so tgt is identity (they land in their cell) and src
-//     is the vitrine offset;
-//   - the showpiece homes in the vitrine, so src is identity and tgt carries it off
-//     below the grid.
+// One tile measured for the morph. Every vessel — peer or showpiece — lerps a SOURCE
+// (its vitrine scatter point + size) to a TARGET (where it lands), expressed as plain
+// viewport-space offsets from the tile's own home box (srcD*/tgtD* + scales). This
+// works for ALL five because during the morph BOTH frames are viewport-fixed:
+//   - the showpiece's home is the viewport-pinned contact sheet (it never joins the
+//     grid); its source is identity and its target carries it off below the viewport;
+//   - the peers' home is their grid cell, and the grid is BROWSER-PINNED (position:
+//     sticky) for the whole morph, so a cell sits at a constant viewport point too.
+//     Their source is the vitrine scatter point. Because the cell is pinned by the
+//     browser (not held by a JS scroll-compensating transform), the morph is a pure
+//     function of progress with no scroll term — which is what removes the jitter.
+// Once the morph completes the grid un-sticks and scrolls; the peers carry tgtD* = 0
+// (identity), so they simply ride the flow to the grid's end.
 interface Rig {
   readonly caption: HTMLElement | null;
   readonly depthBlur: number;
@@ -171,6 +176,7 @@ interface Rig {
   readonly poster: HTMLElement;
   readonly repoUrl: string;
   readonly showpiece: boolean;
+  // Viewport-space source/target offsets from the tile's home box, and the FLIP scale.
   readonly srcDx: number;
   readonly srcDy: number;
   readonly srcScale: number;
@@ -215,11 +221,16 @@ const anchorPoster = (
   return { cx, cy, w: g.width };
 };
 
-// Measure a peer tile at its grid home and derive the vitrine SOURCE it parks at;
-// its target is its own cell (identity). Returns null for an unplaced key.
+// Measure a peer tile at its grid-cell home and derive the viewport-fixed vitrine
+// SOURCE it parks at; its target is its own cell (identity). The grid is browser-pinned
+// (position: sticky; top: 0) for the whole morph, so the cell's viewport position is
+// constant during the morph — we read it as the cell's offset INSIDE the grid
+// container (`home.cy - gridTop`), which is the pinned viewport position and is robust
+// to whatever scroll measure() happens to run at. Returns null for an unplaced key.
 const buildPeerRig = (
   el: HTMLElement,
   pinRect: DOMRect,
+  gridTop: number,
   rem: number,
   vw: number
 ): Rig | null => {
@@ -229,6 +240,11 @@ const buildPeerRig = (
     return null;
   }
   const home = anchorPoster(el, poster);
+  // The grid is sticky-pinned at top: 0 during the morph, so the cell's pinned home is
+  // its offset within the grid container (scroll-independent). Horizontally the grid
+  // is not sticky, so home.cx is already its stable layout centre.
+  const homeCx = home.cx;
+  const homeCy = home.cy - gridTop;
   const vCx = pinRect.left + place.x * pinRect.width;
   const vCy = pinRect.top + place.y * pinRect.height;
   const vW = vitrineWidth(place, rem, vw);
@@ -240,8 +256,8 @@ const buildPeerRig = (
     poster,
     repoUrl: el.dataset.href ?? "",
     showpiece: false,
-    srcDx: vCx - home.cx,
-    srcDy: vCy - home.cy,
+    srcDx: vCx - homeCx,
+    srcDy: vCy - homeCy,
     srcScale: vW / home.w,
     tag: child(el, "[data-tag]"),
     tgtDx: 0,
@@ -251,13 +267,13 @@ const buildPeerRig = (
 };
 
 // Size + place the showpiece at its vitrine point at natural size (its DOM home IS
-// the contact sheet), so SOURCE is identity and blur/corner never scale. Its TARGET
-// is just below the grid, off-screen — the curatorial set-aside, and the seam the
-// finale will later retarget onto the live attractor.
+// the contact sheet), so SOURCE is identity and blur/corner never scale. It stays in
+// the viewport-fixed pin (it never joins the grid). Its TARGET is straight down, just
+// below the pinned viewport — the curatorial set-aside, and the seam the finale will
+// later retarget onto the live attractor.
 const buildShowRig = (
   el: HTMLElement,
   pinRect: DOMRect,
-  gridRect: DOMRect | null,
   rem: number,
   vw: number
 ): Rig | null => {
@@ -275,12 +291,9 @@ const buildShowRig = (
   el.style.left = `${(place.x * pinRect.width - vW / 2).toFixed(2)}px`;
   el.style.top = `${(place.y * pinRect.height - vW / 2).toFixed(2)}px`;
   const home = anchorPoster(el, poster);
-  // Below the grid (its centre x), dropped a full height past the grid's bottom so
-  // it parks off-screen. Falls back to the pin's bottom edge if the grid box is not
-  // measurable yet.
-  const tgtCx = gridRect ? gridRect.left + gridRect.width / 2 : home.cx;
-  const tgtBottom = gridRect ? gridRect.bottom : pinRect.bottom;
-  const tgtCy = tgtBottom + vW;
+  // Straight down past the pin's bottom edge (a full height beyond), so it parks
+  // off-screen as the contact sheet resolves — read as a deliberate set-aside.
+  const tgtCy = pinRect.bottom + vW;
   return {
     caption: null,
     depthBlur: DEPTH_BLUR[place.depth],
@@ -293,7 +306,7 @@ const buildShowRig = (
     srcDy: 0,
     srcScale: 1,
     tag: child(el, "[data-tag]"),
-    tgtDx: tgtCx - home.cx,
+    tgtDx: 0,
     tgtDy: tgtCy - home.cy,
     tgtScale: 1,
   };
@@ -304,6 +317,12 @@ const buildShowRig = (
 // centre), clear the depth blur soft -> sharp, assemble the caption in. The blur and
 // corner are divided by the live scale so the ON-SCREEN values are exactly the
 // hero's (per-depth blur, 1.4rem corner) regardless of the FLIP scale.
+//
+// The translate is a PURE function of progress (no scroll term): both the source
+// (vitrine scatter) and the target (grid cell / set-aside) are viewport-fixed during
+// the morph because the grid is browser-pinned (sticky) and the showpiece lives in
+// the pin. At p=1 the offset is the identity target (0 for peers), so when the grid
+// un-sticks the tile simply rides the flow — no per-frame compensation, no jitter.
 const drive = (rig: Rig, p: number, lit: boolean) => {
   const m = smoothstep(0, 0.72, p);
   const dx = lerp(rig.srcDx, rig.tgtDx, m);
@@ -466,29 +485,37 @@ function MotionStage() {
     const rigByEl = new Map<HTMLElement, Rig>();
 
     // FLIP measurement: read each tile's home, then derive its vitrine source and
-    // its target (the peers' cell / the showpiece's off-screen park below the grid).
+    // its target (the peers' in-flow cell / the showpiece's off-screen park below the
+    // pinned viewport).
     const measure = () => {
       const pinRect = pin.getBoundingClientRect();
-      const gridBox =
-        grid.querySelector<HTMLElement>("ul")?.getBoundingClientRect() ?? null;
       const rem =
         Number.parseFloat(
           getComputedStyle(document.documentElement).fontSize
         ) || 16;
       const vw = window.innerWidth;
+      // Size the stage so the grid's sticky pin RELEASES exactly when the morph
+      // completes: the grid (height = its own natural box) stays pinned for the first
+      // MORPH_END of a viewport of scroll, then un-sticks and scrolls to its end. The
+      // sticky stick-distance equals stageHeight - gridHeight, so set the stage to
+      // gridHeight + the morph distance.
+      const gridHeight = grid.offsetHeight;
+      stage.style.height = `${(gridHeight + MORPH_END * window.innerHeight).toFixed(2)}px`;
+      // The grid is sticky-pinned at top: 0 during the morph; its current container
+      // top lets buildPeerRig recover each cell's PINNED viewport home regardless of
+      // the scroll measure() runs at.
+      const gridTop = grid.getBoundingClientRect().top;
       rigs = [];
       rigByEl.clear();
       for (const el of grid.querySelectorAll<HTMLElement>("a[data-key]")) {
-        const rig = buildPeerRig(el, pinRect, rem, vw);
+        const rig = buildPeerRig(el, pinRect, gridTop, rem, vw);
         if (rig) {
           rigs.push(rig);
           rigByEl.set(el, rig);
         }
       }
       const showEl = vitrine.querySelector<HTMLElement>("a[data-key]");
-      const showRig = showEl
-        ? buildShowRig(showEl, pinRect, gridBox, rem, vw)
-        : null;
+      const showRig = showEl ? buildShowRig(showEl, pinRect, rem, vw) : null;
       if (showRig) {
         rigs.push(showRig);
         rigByEl.set(showRig.el, showRig);
@@ -556,9 +583,12 @@ function MotionStage() {
     };
 
     const compute = () => {
-      const denom = stage.offsetHeight - window.innerHeight;
+      // The morph runs over the FIRST viewport of scroll (MORPH_END of it), which is
+      // also where the grid stays sticky-pinned; -top is how far the stage top has
+      // scrolled above the viewport top.
+      const travel = window.innerHeight;
       const top = stage.getBoundingClientRect().top;
-      const raw = denom > 0 ? clamp(-top / denom, 0, 1) : 0;
+      const raw = travel > 0 ? clamp(-top / travel, 0, 1) : 0;
       const progress = clamp(raw / MORPH_END, 0, 1);
       if (progress === lastProgress) {
         return;
@@ -617,13 +647,13 @@ function MotionStage() {
       // (srcScale -> 1, srcDx -> 0) so every peer resolves straight to the grid ("the
       // morph is already done at the hero"). Dropping `.ready` makes the clear instant,
       // so the read is the real grid cell; it is restored after the re-placement paints.
-      const wasReady = pin.classList.contains(styles.ready);
-      pin.classList.remove(styles.ready);
+      const wasReady = stage.classList.contains(styles.ready);
+      stage.classList.remove(styles.ready);
       measure();
       lastProgress = -1;
       compute();
       if (wasReady) {
-        requestAnimationFrame(() => pin.classList.add(styles.ready));
+        requestAnimationFrame(() => stage.classList.add(styles.ready));
       }
     };
 
@@ -633,17 +663,17 @@ function MotionStage() {
     // painted, so the first frame snaps the tiles into the contact sheet instead of
     // animating them out of the grid.
     const readyRaf = requestAnimationFrame(() =>
-      pin.classList.add(styles.ready)
+      stage.classList.add(styles.ready)
     );
 
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", remeasure);
-    // The coordinator listens on the whole pin so it catches both the grid peers and
-    // the absolutely-placed showpiece in the vitrine layer.
-    pin.addEventListener("pointerover", onOver);
-    pin.addEventListener("pointerleave", onLeave);
-    pin.addEventListener("focusin", onFocusIn);
-    pin.addEventListener("focusout", onFocusOut);
+    // The coordinator listens on the whole stage so it catches both the in-flow grid
+    // peers and the absolutely-placed showpiece in the pin's vitrine layer.
+    stage.addEventListener("pointerover", onOver);
+    stage.addEventListener("pointerleave", onLeave);
+    stage.addEventListener("focusin", onFocusIn);
+    stage.addEventListener("focusout", onFocusOut);
     // The grid box (and so the scatter deltas) can shift after web fonts swap in or
     // any reflow; re-measure so the FLIP stays true.
     const observer = new ResizeObserver(remeasure);
@@ -652,16 +682,16 @@ function MotionStage() {
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", remeasure);
-      pin.removeEventListener("pointerover", onOver);
-      pin.removeEventListener("pointerleave", onLeave);
-      pin.removeEventListener("focusin", onFocusIn);
-      pin.removeEventListener("focusout", onFocusOut);
+      stage.removeEventListener("pointerover", onOver);
+      stage.removeEventListener("pointerleave", onLeave);
+      stage.removeEventListener("focusin", onFocusIn);
+      stage.removeEventListener("focusout", onFocusOut);
       observer.disconnect();
       if (raf !== 0) {
         cancelAnimationFrame(raf);
       }
       cancelAnimationFrame(readyRaf);
-      pin.classList.remove(styles.ready);
+      stage.classList.remove(styles.ready);
       for (const rig of rigs) {
         restoreRig(rig);
       }
@@ -672,6 +702,7 @@ function MotionStage() {
       baton.style.opacity = "";
       pin.style.removeProperty("--live-accent");
       pin.removeAttribute("data-settling");
+      stage.style.height = "";
     };
   }, []);
 
@@ -681,22 +712,8 @@ function MotionStage() {
         <div className={styles.tint} />
         <div className={styles.grain} ref={grainRef} />
 
-        {/* the resolved 2x2's DOM home — the four peer tiles live here in grid flow,
-            parked out in the contact sheet at rest and carried back on scroll */}
-        <div className={styles.gridHome} ref={gridRef}>
-          <section className={proofStyles.section}>
-            <ul className={proofStyles.grid}>
-              {PEER_MODELS.map((model) => (
-                <li className={proofStyles.item} key={model.key}>
-                  <ProjectTile model={model} />
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
-
         {/* the showpiece tile — its DOM home is the contact sheet, never the grid;
-            it sets itself aside toward a point just below the grid */}
+            it sets itself aside toward a point just below the viewport */}
         <div className={styles.vitrine} ref={vitrineRef}>
           <ProjectTile model={SHOWPIECE_MODEL} />
         </div>
@@ -718,6 +735,23 @@ function MotionStage() {
         <p className={`scroll-baton ${styles.baton}`} ref={batonRef}>
           {content.hero.scrollBaton}
         </p>
+      </div>
+
+      {/* the resolved 2x2's home — pulled up over the pinned contact sheet (negative
+          margin) and BROWSER-PINNED there (position: sticky) for the morph, so the
+          four peer tiles morph across it by pure transform with no JS scroll
+          compensation (no jitter). When the morph completes the sticky releases and
+          this scrolls away as a plain grid, read to its end. */}
+      <div className={styles.gridStick} ref={gridRef}>
+        <section className={proofStyles.section}>
+          <ul className={proofStyles.grid}>
+            {PEER_MODELS.map((model) => (
+              <li className={proofStyles.item} key={model.key}>
+                <ProjectTile model={model} />
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
     </div>
   );
