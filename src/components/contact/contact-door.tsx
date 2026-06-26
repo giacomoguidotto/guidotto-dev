@@ -38,8 +38,34 @@ import { GitHubMark, LinkedInMark, XMark } from "./social-icons";
 const { cta } = content;
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+// `render=explicit` stops the script from auto-scanning for `.cf-turnstile`
+// elements: we render the widget ourselves in an effect so it re-initialises
+// cleanly every time the form remounts, and so the minted token lands in React
+// state where Send can wait on it.
 const TURNSTILE_SCRIPT =
-  "https://challenges.cloudflare.com/turnstile/v0/api.js";
+  "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+
+// The slice of the Cloudflare Turnstile browser API we drive explicitly.
+interface TurnstileApi {
+  remove: (widgetId: string) => void;
+  render: (
+    container: HTMLElement,
+    options: {
+      readonly sitekey: string;
+      readonly appearance?: "always" | "execute" | "interaction-only";
+      readonly callback?: (token: string) => void;
+      readonly "error-callback"?: () => void;
+      readonly "expired-callback"?: () => void;
+      readonly theme?: "auto" | "dark" | "light";
+    }
+  ) => string;
+}
+
+declare global {
+  interface Window {
+    turnstile?: TurnstileApi;
+  }
+}
 
 type Status = "idle" | "sending" | "sent" | "error";
 
@@ -97,6 +123,8 @@ export function ContactDoor() {
   const summaryRef = useRef<HTMLElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
+  const turnstileRef = useRef<HTMLDivElement>(null);
+  const widgetId = useRef<string | null>(null);
   const wasOpen = useRef(false);
   // Whether the next close should pull focus back to the pill. True for keyboard
   // dismissals (Escape) so a keyboard user is never stranded; flipped to false
@@ -114,6 +142,11 @@ export function ContactDoor() {
   const [hasOpened, setHasOpened] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [errorReason, setErrorReason] = useState<string | null>(null);
+  // The Turnstile token, captured from the widget's callback. Empty until
+  // Cloudflare has cleared the visitor; Send stays disabled until it lands so a
+  // quick click can never post a null token. The interaction-only widget is
+  // invisible, so there is otherwise no cue that it is still working.
+  const [token, setToken] = useState("");
   // canMorph: the View Transitions API is present and motion is welcome, so the
   // door is allowed to grow the field cascade's start delay to match the morph.
   // Resolved after mount so SSR and first paint agree.
@@ -230,8 +263,68 @@ export function ContactDoor() {
     };
   }, [open, setDoor, resetForm]);
 
+  // The form (and so the Turnstile container) is mounted whenever the door has
+  // been opened and we are not showing the post-send confirmation.
+  const turnstileMounted = hasOpened && status !== "sent";
+
+  // Render the invisible Turnstile widget once its script is ready and capture
+  // the token into state. We render explicitly (rather than via the script's
+  // auto-scan) so the widget re-initialises every time the form remounts — after
+  // a send, or a close-and-reopen — and so the token is React state we can hold
+  // Send on. Fails safe: on expiry or error the token clears and Send re-locks.
+  useEffect(() => {
+    if (!(turnstileMounted && TURNSTILE_SITE_KEY)) {
+      return;
+    }
+    let cancelled = false;
+    let pollId: number | undefined;
+    const renderWidget = () => {
+      const api = window.turnstile;
+      const container = turnstileRef.current;
+      if (cancelled || !(api && container) || widgetId.current !== null) {
+        return;
+      }
+      widgetId.current = api.render(container, {
+        sitekey: TURNSTILE_SITE_KEY,
+        appearance: "interaction-only",
+        theme: "dark",
+        callback: (value: string) => setToken(value),
+        "expired-callback": () => setToken(""),
+        "error-callback": () => setToken(""),
+      });
+    };
+    // The API may still be loading; poll briefly until it is on `window`.
+    if (window.turnstile) {
+      renderWidget();
+    } else {
+      pollId = window.setInterval(() => {
+        if (window.turnstile) {
+          window.clearInterval(pollId);
+          renderWidget();
+        }
+      }, 150);
+    }
+    return () => {
+      cancelled = true;
+      if (pollId !== undefined) {
+        window.clearInterval(pollId);
+      }
+      const api = window.turnstile;
+      if (api && widgetId.current !== null) {
+        api.remove(widgetId.current);
+      }
+      widgetId.current = null;
+      setToken("");
+    };
+  }, [turnstileMounted]);
+
   const submit = async (form: HTMLFormElement) => {
     const data = new FormData(form);
+    // Should be unreachable — Send is disabled until the token lands — but guard
+    // so no path can post the null token that silently fails Turnstile (403).
+    if (TURNSTILE_SITE_KEY && token === "") {
+      return;
+    }
     setStatus("sending");
     setErrorReason(null);
     try {
@@ -242,8 +335,8 @@ export function ContactDoor() {
           name: data.get("name"),
           email: data.get("email"),
           message: data.get("message"),
-          honeypot: data.get("company"),
-          token: data.get("cf-turnstile-response"),
+          honeypot: data.get("contact_extra"),
+          token,
         }),
       });
       if (response.ok) {
@@ -266,6 +359,10 @@ export function ContactDoor() {
       setStatus("error");
     });
   };
+
+  // Hold Send until Turnstile has cleared the visitor. Only when a site key is
+  // configured (otherwise there is no widget to wait on).
+  const verifying = Boolean(TURNSTILE_SITE_KEY) && token === "";
 
   return (
     <div className={styles.stage}>
@@ -300,14 +397,19 @@ export function ContactDoor() {
                 onSubmit={handleSubmit}
                 ref={formRef}
               >
-                {/* Honeypot: off-screen, no human ever fills it; a bot that does
-                    gets a friendly 200 and nothing sent. */}
+                {/* Honeypot: visually hidden and off the tab order, and made
+                    un-autofillable — no label, a neutral name, and the major
+                    password managers' opt-out attributes — so a real visitor's
+                    browser never fills it. A bot that does gets a friendly 200
+                    and nothing sent. */}
                 <div aria-hidden="true" className={styles.honeypot}>
-                  <label htmlFor="contact-company">Company</label>
                   <input
                     autoComplete="off"
-                    id="contact-company"
-                    name="company"
+                    data-1p-ignore="true"
+                    data-bwignore="true"
+                    data-form-type="other"
+                    data-lpignore="true"
+                    name="contact_extra"
                     tabIndex={-1}
                   />
                 </div>
@@ -358,19 +460,17 @@ export function ContactDoor() {
 
                 {TURNSTILE_SITE_KEY && hasOpened ? (
                   <>
-                    <Script async defer src={TURNSTILE_SCRIPT} />
-                    <div
-                      className="cf-turnstile"
-                      data-appearance="interaction-only"
-                      data-sitekey={TURNSTILE_SITE_KEY}
-                      data-theme="dark"
+                    <Script
+                      src={TURNSTILE_SCRIPT}
+                      strategy="afterInteractive"
                     />
+                    <div ref={turnstileRef} />
                   </>
                 ) : null}
 
                 <button
                   className={`${styles.send} ${styles.reveal}`}
-                  disabled={status === "sending"}
+                  disabled={status === "sending" || verifying}
                   style={revealOrder(3)}
                   type="submit"
                 >
