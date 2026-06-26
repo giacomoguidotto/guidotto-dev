@@ -1,4 +1,4 @@
-/* Attractor — the showpiece finale's surface (issue #9, skeleton cut).
+/* Attractor — the showpiece finale's surface (issue #9).
 
    Co-located module CSS, kept OUT of globals.css like the other section slices so
    this slice owns its own surface and never merge-conflicts with the parallel
@@ -6,10 +6,10 @@
    --ivory, the glass tokens, and the earned --accent the section sets from
    content.showpiece) — it never edits them.
 
-   The live WebGL scene is not here yet; `.scene` is a quiet placeholder the R3F
-   instrument will mount into. What this stylesheet owns now is the finale stage,
-   its subtle spotlight, the quiet HUD chrome, and the AnyPINN vessel's small
-   top-left landing slot (where the scroll handoff parks the fifth vessel). */
+   The live WebGL scene mounts into `.canvas` (inside `LiveInstrument`); the DOM
+   overlays — the quiet mono HUD, the epoch scrubber, the interaction hint — float
+   in `.console` over it. The parked AnyPINN vessel and the badge are static chrome
+   layered above the instrument. */
 
 .finale {
   position: relative;
@@ -61,7 +61,7 @@
 .instrument {
   position: relative;
   width: min(100%, 60rem);
-  /* a tall, near-square field for the genuinely-3D object (drag-to-orbit later) */
+  /* a tall, near-square field for the genuinely-3D object (drag-to-orbit) */
   aspect-ratio: 16 / 11;
   margin: 0 auto;
   overflow: hidden;
@@ -84,22 +84,200 @@
   box-shadow: 0 40px 90px -40px oklch(0 0 0 / 0.9);
 }
 
-/* the scene placeholder: where the WebGL attractor mounts. A quiet centered label
-   stands in for the spectacle until the lazy-loaded scene replaces it. */
-.scene {
+/* ---------- LiveInstrument: the canvas layer + the console overlays ---------- */
+
+.live {
   position: absolute;
   inset: 0;
   z-index: 0;
-  display: grid;
-  place-items: center;
 }
 
-.scenePlaceholder {
-  font-family: var(--font-display), Georgia, serif;
-  font-size: clamp(1.1rem, 2.4vw, 1.6rem);
-  font-style: italic;
-  color: color-mix(in oklch, var(--ivory) 26%, transparent);
+.canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.staticCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* a quiet breathing wash while the asset loads + trajectories precompute. */
+.loading {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    60% 50% at 50% 46%,
+    color-mix(in oklch, var(--accent) 14%, transparent) 0%,
+    transparent 70%
+  );
+  animation: finale-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes finale-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* the bottom control strip: HUD row, interaction hint, scrubber. Non-interactive
+   so a drag over it still orbits the scene; only the scrubber re-enables input. */
+.console {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.55rem, 1.6vw, 0.95rem);
+  padding: clamp(1rem, 2.4vw, 1.7rem);
+  pointer-events: none;
+}
+
+/* ---------- HUD (quiet mono readout) ---------- */
+
+.hud {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.hudParams {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.hudLoss {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.hudLabel {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.58rem;
+  color: color-mix(in oklch, var(--ivory) 46%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.24em;
+}
+
+/* a settling knob: symbol, a track with a dot that drifts to the recovered value
+   (NO ground-truth target marker is ever drawn), and the live value. */
+.knob {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.64rem;
+  color: color-mix(in oklch, var(--ivory) 72%, transparent);
+}
+
+.knobSymbol {
+  width: 1.1em;
+  color: color-mix(in oklch, var(--accent) 70%, var(--ivory));
+}
+
+.knobTrack {
+  position: relative;
+  width: clamp(3.4rem, 10vw, 5.4rem);
+  height: 1px;
+  background: color-mix(in oklch, var(--ivory) 18%, transparent);
+}
+
+.knobDot {
+  position: absolute;
+  top: 50%;
+  left: var(--knob, 50%);
+  width: 6px;
+  height: 6px;
+  background: color-mix(in oklch, var(--accent) 80%, var(--ivory));
+  border-radius: 50%;
+  box-shadow: 0 0 8px color-mix(in oklch, var(--accent) 70%, transparent);
+  translate: -50% -50%;
+  transition: left 0.22s ease-out;
+}
+
+.knobValue {
+  min-width: 3.4ch;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklch, var(--ivory) 84%, transparent);
+  text-align: right;
+}
+
+.lossValue {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklch, var(--accent) 60%, var(--ivory));
   letter-spacing: 0.02em;
+}
+
+/* ---------- the interaction hint + the epoch scrubber / progress bar ---------- */
+
+.interaction {
+  margin: 0;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.62rem;
+  color: color-mix(in oklch, var(--ivory) 46%, transparent);
+  text-align: center;
+  letter-spacing: 0.12em;
+}
+
+/* the scrubber IS the epoch progress bar (no counter label): its fill tracks the
+   replay, and dragging it scrubs training. */
+.scrubber {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 1.1rem;
+  pointer-events: auto;
+}
+
+.scrubberTrack {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  overflow: hidden;
+  background: color-mix(in oklch, var(--ivory) 14%, transparent);
+  border-radius: 999px;
+}
+
+.scrubberFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--accent) 40%, transparent),
+    var(--accent)
+  );
+  box-shadow: 0 0 10px color-mix(in oklch, var(--accent) 60%, transparent);
+}
+
+/* the native range sits invisible over the track, carrying the drag + keyboard
+   interaction and the accessible label. */
+.scrubberInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.scrubber:focus-within .scrubberTrack {
+  outline: 2px solid color-mix(in oklch, var(--accent) 60%, transparent);
+  outline-offset: 3px;
 }
 
 /* ---------- the landed fifth vessel (AnyPINN, small, top-left) ---------- */
@@ -156,31 +334,14 @@
   white-space: nowrap;
 }
 
-/* ---------- HUD (quiet mono readout, bottom-right) ---------- */
-
-.hud {
-  position: absolute;
-  right: clamp(0.9rem, 2.2vw, 1.6rem);
-  bottom: clamp(0.9rem, 2.2vw, 1.6rem);
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  align-items: flex-end;
-  text-align: right;
-}
-
-.hudLabel {
-  font-family: var(--font-mono), monospace;
-  font-size: 0.62rem;
-  color: color-mix(in oklch, var(--ivory) 50%, transparent);
-  text-transform: uppercase;
-  letter-spacing: 0.24em;
-}
+/* ---------- the badge (top-right, always present across tiers) ---------- */
 
 .badge {
+  position: absolute;
+  top: clamp(0.9rem, 2.2vw, 1.6rem);
+  right: clamp(0.9rem, 2.2vw, 1.6rem);
+  z-index: 2;
   padding: 0.28rem 0.6rem;
-  margin-top: 0.2rem;
   font-family: var(--font-mono), monospace;
   font-size: 0.58rem;
   color: color-mix(in oklch, var(--accent) 64%, var(--ivory));
@@ -189,21 +350,6 @@
   background: color-mix(in oklch, var(--accent) 12%, transparent);
   border: 1px solid color-mix(in oklch, var(--accent) 34%, transparent);
   border-radius: 999px;
-}
-
-/* the interaction affordance, bottom-centre and quiet. */
-.interaction {
-  position: absolute;
-  bottom: clamp(0.9rem, 2.2vw, 1.6rem);
-  left: 50%;
-  z-index: 2;
-  margin: 0;
-  font-family: var(--font-mono), monospace;
-  font-size: 0.62rem;
-  color: color-mix(in oklch, var(--ivory) 46%, transparent);
-  letter-spacing: 0.12em;
-  white-space: nowrap;
-  transform: translateX(-50%);
 }
 
 /* ---------- footer (the caption + the standalone footer sentence) ---------- */
@@ -234,14 +380,30 @@
   letter-spacing: 0.04em;
 }
 
-/* ---------- narrow: let the HUD and interaction copy breathe ---------- */
+/* ---------- narrow: let the HUD and controls breathe ---------- */
 
 @media (max-width: 40rem) {
   .interaction {
     font-size: 0.56rem;
   }
 
+  .knobTrack {
+    display: none;
+  }
+
   .landing {
     width: clamp(4rem, 18vw, 5rem);
+  }
+}
+
+/* reduced motion: the loading wash never pulses (the scene itself renders a
+   static still in this tier; this only quiets the transient loader). */
+@media (prefers-reduced-motion: reduce) {
+  .loading {
+    animation: none;
+  }
+
+  .knobDot {
+    transition: none;
   }
 }
