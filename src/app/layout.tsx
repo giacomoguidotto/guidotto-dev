@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, JetBrains_Mono } from "next/font/google";
 import { content } from "~/content";
 import "./globals.css";
@@ -22,9 +22,15 @@ const { site } = content;
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
+  applicationName: site.name,
   title: site.title,
   description: site.description,
+  authors: [{ name: site.name, url: site.url }],
+  creator: site.name,
+  publisher: site.name,
+  category: "technology",
   alternates: { canonical: "/" },
+  formatDetection: { email: false, address: false, telephone: false },
   openGraph: {
     type: "website",
     siteName: site.name,
@@ -38,17 +44,52 @@ export const metadata: Metadata = {
     title: site.title,
     description: site.description,
   },
-  robots: { index: true, follow: true },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  colorScheme: "dark",
+  // The deep stage field (globals.css `--stage-deep`, restated in sRGB) so the
+  // browser chrome matches the page on mobile and in PWA shells.
+  themeColor: "#06070c",
 };
 
 const personJsonLd = {
-  "@context": "https://schema.org",
   "@type": "Person",
+  "@id": `${site.url}/#person`,
   name: site.name,
   jobTitle: site.jobTitle,
   url: site.url,
   description: site.description,
+  image: new URL("/portrait/giacomo.jpg", site.url).toString(),
   sameAs: site.sameAs,
+};
+
+const websiteJsonLd = {
+  "@type": "WebSite",
+  "@id": `${site.url}/#website`,
+  url: site.url,
+  name: site.title,
+  description: site.description,
+  inLanguage: site.locale,
+  author: { "@id": `${site.url}/#person` },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [personJsonLd, websiteJsonLd],
 };
 
 export default function RootLayout({
@@ -58,9 +99,7 @@ export default function RootLayout({
     <html lang={site.locale}>
       <body className={`${fraunces.variable} ${jetbrainsMono.variable}`}>
         {children}
-        <script type="application/ld+json">
-          {JSON.stringify(personJsonLd)}
-        </script>
+        <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
       </body>
     </html>
   );
