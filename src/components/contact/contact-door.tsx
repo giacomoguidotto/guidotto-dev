@@ -95,8 +95,14 @@ function QuietRail() {
 export function ContactDoor() {
   const doorRef = useRef<HTMLDetailsElement>(null);
   const summaryRef = useRef<HTMLElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const wasOpen = useRef(false);
+  // Whether the next close should pull focus back to the pill. True for keyboard
+  // dismissals (Escape) so a keyboard user is never stranded; flipped to false
+  // for a pointer click outside, where yanking focus back — and flashing the
+  // pill's focus ring — would be unexpected.
+  const restoreFocus = useRef(true);
 
   const [open, setOpen] = useState(false);
   // hasOpened latches true the first time the door opens. The Turnstile loader is
@@ -122,8 +128,11 @@ export function ContactDoor() {
 
   // The single toggle. The DOM mutation (el.open) is synchronous so the View
   // Transition snapshots a clean before/after; everything else (React state,
-  // the morph) follows from the resulting `toggle` event.
-  const setDoor = useCallback((next: boolean) => {
+  // the morph) follows from the resulting `toggle` event. `afterSettle` runs
+  // once the morph has fully finished, so any content change the caller wants to
+  // make (resetting the form on close) lands while the card is hidden behind the
+  // collapsed pill rather than flashing through the still-open card.
+  const setDoor = useCallback((next: boolean, afterSettle?: () => void) => {
     const el = doorRef.current;
     if (!el) {
       return;
@@ -137,10 +146,16 @@ export function ContactDoor() {
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (supported && !reduce) {
-      document.startViewTransition(apply);
-    } else {
-      apply();
+      const transition = document.startViewTransition(apply);
+      if (afterSettle) {
+        // `.finished` rejects if the transition is skipped; either way the card
+        // has settled, so run the callback on both outcomes.
+        transition.finished.then(afterSettle, afterSettle);
+      }
+      return;
     }
+    apply();
+    afterSettle?.();
   }, []);
 
   const handleSummaryClick = (event: MouseEvent<HTMLElement>) => {
@@ -155,6 +170,17 @@ export function ContactDoor() {
     setDoor(true);
   };
 
+  // Dismissing the card discards the draft: clear the fields and drop any sent /
+  // error state so the next open is a fresh form rather than a stale "Got it!"
+  // or a half-typed message. The inputs are uncontrolled, so the actual clearing
+  // is the form's native reset(); when the form is unmounted (the sent state),
+  // dropping status back to "idle" remounts it empty anyway.
+  const resetForm = useCallback(() => {
+    formRef.current?.reset();
+    setStatus("idle");
+    setErrorReason(null);
+  }, []);
+
   // Keep React state in step with the real <details>, whoever flipped it.
   const handleToggle = () => {
     const el = doorRef.current;
@@ -166,17 +192,19 @@ export function ContactDoor() {
     }
   };
 
-  // Open hands focus to the first field; closing returns it to the door.
+  // Open hands focus to the first field; closing returns it to the door, but
+  // only when the close was a keyboard dismissal — a pointer click outside
+  // leaves focus where the click landed (and so never flashes the pill's ring).
   useEffect(() => {
     if (open) {
       firstFieldRef.current?.focus();
-    } else if (wasOpen.current) {
+    } else if (wasOpen.current && restoreFocus.current) {
       summaryRef.current?.focus();
     }
     wasOpen.current = open;
   }, [open]);
 
-  // Click-outside and Escape close the open card.
+  // Click-outside and Escape close the open card and reset the form.
   useEffect(() => {
     if (!open) {
       return;
@@ -184,12 +212,14 @@ export function ContactDoor() {
     const onPointerDown = (event: PointerEvent) => {
       const el = doorRef.current;
       if (el && !el.contains(event.target as Node)) {
-        setDoor(false);
+        restoreFocus.current = false;
+        setDoor(false, resetForm);
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setDoor(false);
+        restoreFocus.current = true;
+        setDoor(false, resetForm);
       }
     };
     document.addEventListener("pointerdown", onPointerDown);
@@ -198,7 +228,7 @@ export function ContactDoor() {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open, setDoor]);
+  }, [open, setDoor, resetForm]);
 
   const submit = async (form: HTMLFormElement) => {
     const data = new FormData(form);
@@ -254,7 +284,9 @@ export function ContactDoor() {
             ref={summaryRef}
           >
             <span aria-hidden="true" className={styles.summaryDot} />
-            <span className={styles.label}>{cta.button}</span>
+            <span className={styles.label}>
+              {open && status === "sent" ? cta.confirmationTitle : cta.button}
+            </span>
           </summary>
 
           <div className={styles.panel}>
@@ -263,7 +295,11 @@ export function ContactDoor() {
                 {cta.confirmation}
               </p>
             ) : (
-              <form className={styles.form} onSubmit={handleSubmit}>
+              <form
+                className={styles.form}
+                onSubmit={handleSubmit}
+                ref={formRef}
+              >
                 {/* Honeypot: off-screen, no human ever fills it; a bot that does
                     gets a friendly 200 and nothing sent. */}
                 <div aria-hidden="true" className={styles.honeypot}>

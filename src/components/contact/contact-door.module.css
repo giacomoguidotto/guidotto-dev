@@ -133,6 +133,13 @@
   cursor: default;
 }
 
+/* Open, the header is an inert title, not a toggle, and focus has moved on to
+   the first field. Suppressing its focus ring keeps the pill-radius (999px)
+   outline from ever drawing over the card and giving the pill->card morph away. */
+.door[open] .summary:focus-visible {
+  outline: none;
+}
+
 .summaryDot {
   width: 0.5rem;
   height: 0.5rem;
