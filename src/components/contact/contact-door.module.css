@@ -18,7 +18,16 @@
    bloom rising from beneath the door so the one loud CTA sits in a pool of blue
    light rather than on a band. The bloom is a brighter cool blue than the dark
    --stage-* floor (which tops out too dark to read as light) and is centred low
-   (50% 66%) so it reads as coming from under the closed pill. */
+   (50% 66%) so it reads as coming from under the closed pill.
+
+   The content is vertically CENTRED, so the door — pill or open card — sits on
+   the midline. The card growing taller therefore re-centres about that midline
+   rather than dropping below it. The one hazard of centring a growing element is
+   a card taller than the foot: its top would spill UP past the stage and drag the
+   preceding section into view (and the open-focus would scroll up to chase it).
+   That is foreclosed at the source — the open card is capped to the viewport
+   (.door[open] max-height) and scrolls its own form — so a centred card can never
+   exceed the foot it is centred in. */
 .stage {
   display: grid;
   place-items: center;
@@ -161,6 +170,19 @@
 .panel {
   padding: 0 1.7rem 1.7rem;
   text-align: left;
+}
+
+/* When the card is open, the form area is capped to (viewport - the title row)
+   and scrolls its own overflow, so the whole card — title row plus form — can
+   never be taller than the foot it is centred in. That is what keeps a centred
+   card from spilling its top up over the preceding section on a short viewport.
+   The cap is generous (~90svh), so on any normal viewport the form is well within
+   it and nothing scrolls; it only engages when the window is genuinely too short
+   to hold the open form. */
+.door[open] .panel {
+  max-height: calc(90svh - 5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .form {
