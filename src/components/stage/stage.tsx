@@ -306,8 +306,12 @@ const buildShowRig = (
   // centre, then slide off below the pin toward it. The slot's width + x are
   // scroll-independent, so this stays robust whatever scroll measure() runs at; the
   // set-aside still lives in the viewport-fixed pin, so the morph stays jitter-free.
-  const tgtScale = landing ? landing.width / home.w : 1;
-  const tgtCx = landing ? landing.left + landing.width / 2 : home.cx;
+  // Guard the ratio: a not-yet-laid-out slot (zero width) or a degenerate home must
+  // fall back to the natural-size set-aside, never a divide-by-zero scale (Infinity)
+  // or a collapse to nothing (0).
+  const aimed = landing !== null && landing.width > 0 && home.w > 0;
+  const tgtScale = aimed ? landing.width / home.w : 1;
+  const tgtCx = aimed ? landing.left + landing.width / 2 : home.cx;
   const tgtCy = pinRect.bottom + vW * tgtScale;
   return {
     caption: null,

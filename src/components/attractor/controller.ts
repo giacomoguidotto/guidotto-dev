@@ -32,9 +32,14 @@ export function createController(snapshotCount: number): FinaleController {
   };
 }
 
-/** Fractional snapshot index for a progress value (for morph interpolation). */
+/** Fractional snapshot index for a progress value (for morph interpolation).
+ *  Progress is clamped to [0, 1] here so a stray out-of-range write (a future
+ *  input path, a rounding overshoot) can never derive an out-of-bounds snapshot
+ *  index — `Showpiece.params`/`loss` assert their index and would otherwise throw
+ *  inside the HUD's animation frame. */
 export function snapshotFloat(controller: FinaleController): number {
-  return controller.progress * (controller.snapshotCount - 1);
+  const progress = Math.min(1, Math.max(0, controller.progress));
+  return progress * (controller.snapshotCount - 1);
 }
 
 /** Nearest integer snapshot index for a progress value (for HUD params/loss). */

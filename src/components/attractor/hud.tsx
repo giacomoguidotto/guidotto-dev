@@ -112,8 +112,15 @@ export function Hud({
     }
 
     let raf = 0;
+    let last = -1;
     const tick = () => {
-      paint(snapshotIndex(controller));
+      const index = snapshotIndex(controller);
+      // The HUD only changes on a snapshot boundary; skip the DOM otherwise (the
+      // idle converged steady-state then writes nothing every frame).
+      if (index !== last) {
+        last = index;
+        paint(index);
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

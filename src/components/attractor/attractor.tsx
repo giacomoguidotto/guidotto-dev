@@ -62,9 +62,12 @@ export function Attractor() {
         <LiveInstrument />
 
         {/* The landed fifth vessel: AnyPINN, small, top-left — the seam the Stage
-            set-aside aims at. Poster-only, like the contact-sheet vessel. */}
-        <div className={styles.landing} data-finale-landing>
-          <span className={styles.vessel}>
+            set-aside aims at. Poster-only, like the contact-sheet vessel. The
+            [data-finale-landing] hook sits on the vessel's media box itself (not
+            the column that also holds the tag), so the Stage shrinks the departing
+            vessel to exactly the box it lands in, even if this layout shifts. */}
+        <div className={styles.landing}>
+          <span className={styles.vessel} data-finale-landing>
             <ProjectMedia motif={showpiece.motif} />
             <span className={styles.vesselGlass} />
           </span>

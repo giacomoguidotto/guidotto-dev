@@ -3,14 +3,21 @@
 // LiveInstrument — the client orchestrator for the finale's instrument area.
 //
 // It owns the degradation ladder and the lazy-load discipline:
-//   - it detects capability (prefers-reduced-motion, WebGL support) up front;
-//   - it loads the showpiece asset + precomputes the trajectories only once the
-//     finale scrolls into view (an IntersectionObserver gates `loadFinaleData`),
-//     so neither the 6.8 MB asset nor — via the ssr:false dynamic import below —
-//     three.js ever enters the initial HTML / critical JS budget;
-//   - it picks the tier: full spectacle (R3F scene) for a capable, motion-welcome
-//     visitor; a static converged butterfly otherwise; and it drops to the static
-//     tier if the live scene throws (the SceneBoundary).
+//   - it detects capability (prefers-reduced-motion, WebGL support) up front and
+//     keeps listening for reduced-motion changes;
+//   - for a motion-welcome, capable visitor it loads the showpiece asset +
+//     precomputes the trajectories only once the finale scrolls into view (an
+//     IntersectionObserver gates `loadFinaleData`), so neither the 6.8 MB asset
+//     nor — via the ssr:false dynamic import below — three.js ever enters the
+//     initial HTML / critical JS budget;
+//   - it picks the tier:
+//       full     — the R3F scene (capable + motion-welcome);
+//       static   — the data-driven 2D butterfly (no WebGL, motion fine), or the
+//                  drop-target if the live scene throws / loses its context;
+//       poster   — the baked still <img> (reduced motion, or a failed asset load):
+//                  the true floor, which fetches/computes nothing and never a hole.
+//   - while the finale is off-screen it pauses the scene's frame loop, so the
+//     perpetual comet/bloom never burns frames the visitor cannot see.
 //
 // The HUD and scrubber render as DOM overlays beside the canvas, sharing the one
 // mutable controller with the scene (see controller.ts).
@@ -39,6 +46,9 @@ const AttractorScene = dynamic(() => import("./attractor-scene"), {
   loading: () => null,
 });
 
+const POSTER_LABEL =
+  "The recovered Lorenz attractor, converged into its butterfly.";
+
 type Mode = "full" | "static";
 type Status = "idle" | "loading" | "ready" | "failed";
 
@@ -47,7 +57,14 @@ const copy = content.showpiece;
 function webglAvailable(): boolean {
   try {
     const probe = document.createElement("canvas");
-    return Boolean(probe.getContext("webgl2") || probe.getContext("webgl"));
+    const gl = probe.getContext("webgl2") ?? probe.getContext("webgl");
+    if (!gl) {
+      return false;
+    }
+    // Browsers cap simultaneous WebGL contexts (~16); free the probe so it never
+    // counts against the real <Canvas>.
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    return true;
   } catch {
     return false;
   }
@@ -82,20 +99,39 @@ function freezeConverged(controller: FinaleController): void {
   controller.autoplayActive = false;
 }
 
+/** The baked still: the floor of the ladder (reduced motion or a failed load).
+ *  A CSS background of the committed SVG — fetches nothing else, no JS, no CLS. */
+function PosterStill() {
+  return <div aria-label={POSTER_LABEL} className={styles.poster} role="img" />;
+}
+
 export function LiveInstrument() {
   const rootRef = useRef<HTMLDivElement>(null);
   const dataRef = useRef<FinaleData | null>(null);
   const controllerRef = useRef<FinaleController | null>(null);
   const started = useRef(false);
+  const [reduced, setReduced] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [mode, setMode] = useState<Mode>("full");
+  // Whether the scene should render frames — false while the finale is off-screen.
+  const [active, setActive] = useState(true);
 
+  // Capability: prefers-reduced-motion, kept live (a visitor can toggle it).
   useEffect(() => {
-    const reduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-    const initialMode: Mode = reduced || !webglAvailable() ? "static" : "full";
-    setMode(initialMode);
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  // Load + visibility. Reduced motion takes the poster floor (no fetch, no three).
+  useEffect(() => {
+    if (reduced) {
+      return;
+    }
+    const webgl = webglAvailable();
+    setMode(webgl ? "full" : "static");
 
     const begin = () => {
       if (started.current) {
@@ -106,7 +142,7 @@ export function LiveInstrument() {
       loadFinaleData()
         .then((data) => {
           const controller = createController(data.snapshotCount);
-          if (initialMode === "static") {
+          if (!webgl) {
             freezeConverged(controller);
           }
           dataRef.current = data;
@@ -121,18 +157,23 @@ export function LiveInstrument() {
       begin();
       return;
     }
+    // One persistent observer: it triggers the load on first approach (200px
+    // rootMargin) and tracks visibility so the scene's frame loop pauses when the
+    // finale leaves the viewport. Because no frames run off-screen, the once-on-view
+    // autoplay cannot play unseen either (the timeline only advances on frames).
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
+        const visible = entries.some((entry) => entry.isIntersecting);
+        if (visible) {
           begin();
-          observer.disconnect();
         }
+        setActive(visible);
       },
       { rootMargin: "200px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [reduced]);
 
   const failToStatic = useCallback(() => {
     if (controllerRef.current) {
@@ -147,18 +188,22 @@ export function LiveInstrument() {
 
   return (
     <div className={styles.live} ref={rootRef}>
-      {status === "loading" && (
+      {reduced && <PosterStill />}
+      {!reduced && status === "failed" && <PosterStill />}
+      {!reduced && status === "loading" && (
         <div aria-hidden="true" className={styles.loading} />
       )}
-      {ready && (
+      {!reduced && ready && (
         <>
           <div className={styles.canvas}>
             {mode === "full" ? (
               <SceneBoundary onError={failToStatic}>
                 <AttractorScene
                   accent={copy.accent}
+                  active={active}
                   controller={controller}
                   data={data}
+                  onContextLost={failToStatic}
                 />
               </SceneBoundary>
             ) : (
@@ -176,7 +221,7 @@ export function LiveInstrument() {
             {mode === "full" && (
               <>
                 <p className={styles.interaction}>{copy.interaction}</p>
-                <Scrubber controller={controller} label={copy.interaction} />
+                <Scrubber controller={controller} />
               </>
             )}
           </div>

@@ -104,6 +104,15 @@
   height: 100%;
 }
 
+/* the baked still floor (reduced motion / failed load): the committed converged
+   butterfly as a contained background, layered over the instrument's spotlight
+   like the live canvas, fetching nothing but the small SVG. */
+.poster {
+  position: absolute;
+  inset: 0;
+  background: url("/showpiece/lorenz/poster.svg") center / contain no-repeat;
+}
+
 /* a quiet breathing wash while the asset loads + trajectories precompute. */
 .loading {
   position: absolute;

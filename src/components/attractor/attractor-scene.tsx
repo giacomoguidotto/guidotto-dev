@@ -33,6 +33,8 @@ import {
   type MeshBasicMaterial,
   type Object3D,
   type PointsMaterial,
+  TOUCH,
+  type WebGLRenderer,
 } from "three";
 import { type FinaleController, snapshotFloat } from "./controller";
 import { type FinaleData, TUBE_SAMPLES } from "./finale-data";
@@ -49,6 +51,9 @@ const INTRO_MS = 1100; // motes rain in
 const HOLD_MS = 300; // a beat on the noisy seed
 const PLAY_MS = 6800; // uncurl 0 -> 1
 const PEAK_DECAY_MS = 1300; // bloom eases back after convergence
+// Clamp the per-frame timeline step, so a pause (off-screen frame loop) or a
+// throttled background tab never makes the autoplay leap on resume.
+const MAX_FRAME_MS = 50;
 
 const FOG_COLOR = "#05060c";
 const FOG_NEAR = 48;
@@ -68,6 +73,13 @@ interface SceneProps {
   readonly data: FinaleData;
 }
 
+interface CanvasProps extends SceneProps {
+  /** False while the finale is off-screen — pauses the frame loop. */
+  readonly active: boolean;
+  /** Drop to the static tier when the GL context is lost (driver reset / OOM). */
+  readonly onContextLost: () => void;
+}
+
 interface Scratch {
   readonly cometCenter: Float32Array;
   readonly cometColors: Float32Array;
@@ -83,17 +95,21 @@ interface Scratch {
 
 interface Clock {
   convergedAt: number;
-  start: number;
+  /** Active-time accumulator (ms) — advances only on rendered frames. */
+  elapsed: number;
 }
 
-/** Advance the once-on-view timeline: motes rain-in, then autoplay the training. */
-function stepTiming(controller: FinaleController, clock: Clock, now: number) {
-  if (clock.start < 0) {
-    clock.start = now;
+/** Advance the once-on-view timeline: motes rain-in, then autoplay the training.
+ *  Driven by accumulated frame time (not wall-clock), so pausing the frame loop
+ *  off-screen freezes the beat rather than skipping it. */
+function stepTiming(controller: FinaleController, clock: Clock, dtMs: number) {
+  if (controller.userScrubbing) {
+    return;
   }
-  const elapsed = now - clock.start;
+  clock.elapsed += Math.min(dtMs, MAX_FRAME_MS);
+  const elapsed = clock.elapsed;
   controller.reveal = smoothstep(0, INTRO_MS, elapsed);
-  if (controller.autoplayActive && !controller.userScrubbing) {
+  if (controller.autoplayActive) {
     const playElapsed = elapsed - INTRO_MS - HOLD_MS;
     if (playElapsed > 0) {
       const raw = clamp01(playElapsed / PLAY_MS);
@@ -264,11 +280,11 @@ function SceneContents({ accent, controller, data }: SceneProps) {
     () => buildScratch(data, accentColor),
     [data, accentColor]
   );
-  const clock = useRef<Clock>({ start: -1, convergedAt: -1 });
+  const clock = useRef<Clock>({ elapsed: 0, convergedAt: -1 });
 
-  useFrame(() => {
+  useFrame((_state, delta) => {
     const now = performance.now();
-    stepTiming(controller, clock.current, now);
+    stepTiming(controller, clock.current, delta * 1000);
     const converged = controller.progress >= CONVERGED;
     stepMotes(
       motesGeom.current,
@@ -308,6 +324,10 @@ function SceneContents({ accent, controller, data }: SceneProps) {
         minPolarAngle={Math.PI * 0.14}
         rotateSpeed={0.55}
         target={[0, 0, 0]}
+        // One finger scrolls the page (the canvas keeps touch-action: pan-y);
+        // two fingers orbit. With ONE left unset, a single-finger touch falls
+        // through OrbitControls to a no-op, so a swipe never traps the page.
+        touches={{ TWO: TOUCH.ROTATE }}
       />
 
       <points>
@@ -399,14 +419,35 @@ function SceneContents({ accent, controller, data }: SceneProps) {
 
 export default function AttractorScene({
   accent,
+  active,
   controller,
   data,
-}: SceneProps) {
+  onContextLost,
+}: CanvasProps) {
+  const handleCreated = ({ gl }: { gl: WebGLRenderer }) => {
+    gl.domElement.addEventListener(
+      "webglcontextlost",
+      (event) => {
+        // A lost context (GPU switch, driver reset, OOM) is a DOM event, not a
+        // React error — the SceneBoundary never sees it. Fall to the static tier.
+        event.preventDefault();
+        onContextLost();
+      },
+      { once: true }
+    );
+  };
+
   return (
     <Canvas
       camera={{ position: [0, 4, 72], fov: 38, near: 0.1, far: 220 }}
       dpr={[1, 1.75]}
+      // Pause rendering while the finale is off-screen (the perpetual comet/bloom
+      // must not burn frames the visitor cannot see).
+      frameloop={active ? "always" : "never"}
       gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
+      onCreated={handleCreated}
+      // One-finger gestures scroll the page; orbit is two-finger (OrbitControls).
+      style={{ touchAction: "pan-y" }}
     >
       <SceneContents accent={accent} controller={controller} data={data} />
     </Canvas>

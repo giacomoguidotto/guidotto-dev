@@ -19,7 +19,8 @@ interface StaticButterflyProps {
   readonly data: FinaleData;
 }
 
-/** Scene-space bounds of the final centerline + motes, for a fit-to-canvas scale. */
+/** Scene-space bounds of the final centerline AND the motes, for a fit that
+ *  never clips the noisy data this tier is partly here to show. */
 function boundsOf(data: FinaleData): {
   minX: number;
   maxX: number;
@@ -30,14 +31,18 @@ function boundsOf(data: FinaleData): {
   let maxX = Number.NEGATIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
-  const line = data.centerlines[data.snapshotCount - 1];
-  for (let i = 0; i < TUBE_SAMPLES; i++) {
-    const x = line[i * 3];
-    const y = line[i * 3 + 1];
+  const fit = (x: number, y: number) => {
     minX = Math.min(minX, x);
     maxX = Math.max(maxX, x);
     minY = Math.min(minY, y);
     maxY = Math.max(maxY, y);
+  };
+  const line = data.centerlines[data.snapshotCount - 1];
+  for (let i = 0; i < TUBE_SAMPLES; i++) {
+    fit(line[i * 3], line[i * 3 + 1]);
+  }
+  for (let i = 0; i < data.moteCount; i++) {
+    fit(data.motes[i * 3], data.motes[i * 3 + 1]);
   }
   return { minX, maxX, minY, maxY };
 }
@@ -110,5 +115,12 @@ export function StaticButterfly({ accent, data }: StaticButterflyProps) {
     return () => observer.disconnect();
   }, [accent, data]);
 
-  return <canvas className={styles.staticCanvas} ref={canvas} />;
+  return (
+    <canvas
+      aria-label="The recovered Lorenz attractor, converged into its butterfly."
+      className={styles.staticCanvas}
+      ref={canvas}
+      role="img"
+    />
+  );
 }

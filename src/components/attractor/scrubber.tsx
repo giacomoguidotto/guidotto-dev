@@ -17,24 +17,34 @@ import { useEffect, useRef } from "react";
 import styles from "./attractor.module.css";
 import type { FinaleController } from "./controller";
 
+// The slider's accessible name describes what IT does — scrub the training epoch.
+// (The visible interaction hint beside it carries the orbit affordance; orbit is
+// not this control's job.)
+const SCRUBBER_LABEL = "Scrub the training epoch";
+
 interface ScrubberProps {
   readonly controller: FinaleController;
-  readonly label: string;
 }
 
-export function Scrubber({ controller, label }: ScrubberProps) {
+export function Scrubber({ controller }: ScrubberProps) {
   const input = useRef<HTMLInputElement>(null);
   const fill = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     let raf = 0;
+    let last = -1;
     const tick = () => {
-      const pct = `${controller.progress * 100}%`;
-      if (fill.current) {
-        fill.current.style.width = pct;
-      }
-      if (input.current && !controller.userScrubbing) {
-        input.current.value = String(controller.progress);
+      const progress = controller.progress;
+      // Idle steady-state writes nothing: skip the DOM until progress moves.
+      if (progress !== last) {
+        last = progress;
+        const pct = `${progress * 100}%`;
+        if (fill.current) {
+          fill.current.style.width = pct;
+        }
+        if (input.current && !controller.userScrubbing) {
+          input.current.value = String(progress);
+        }
       }
       raf = requestAnimationFrame(tick);
     };
@@ -57,13 +67,14 @@ export function Scrubber({ controller, label }: ScrubberProps) {
         <span className={styles.scrubberFill} ref={fill} />
       </span>
       <input
-        aria-label={label}
+        aria-label={SCRUBBER_LABEL}
         className={styles.scrubberInput}
         defaultValue={0}
         max={1}
         min={0}
         onBlur={release}
         onInput={onInput}
+        onKeyUp={release}
         onPointerCancel={release}
         onPointerUp={release}
         ref={input}
