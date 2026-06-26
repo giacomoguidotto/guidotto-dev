@@ -82,6 +82,16 @@
   /* cancel the pin's one viewport of normal flow so the grid shares the first
      viewport with the contact sheet (the pin is height: 100svh) */
   margin-top: -100svh;
+  /* This layer sits ABOVE the pin (z-index 1 vs the pin's auto) so the peer tiles
+     read over the contact sheet during the morph. But the showpiece (AnyPINN)
+     vessel lives in the pin's .vitrine layer BELOW this one, and at rest it sits in
+     the gap between the scattered peers (top-left, ~24%/33%). Without this, the
+     grid's full-width structural boxes (section/ul/li) — opaque to hit-testing —
+     would shadow that gap, so hovering AnyPINN would land on a wrapper instead of
+     the vessel and it could never light. Making the layer pointer-transparent lets
+     the pointer fall through to the showpiece in the pin; the peer tiles (and the
+     resolved live cards) re-take the pointer via their own .tile[data-phase] rule. */
+  pointer-events: none;
 }
 
 /* the accent wash, shared by both states: it rides the one live --live-accent the
@@ -247,4 +257,28 @@
 
 .ready .tile[data-phase="rest"] .restTag {
   transition: opacity 0.4s ease;
+}
+
+/* ---- handoff scroll-snap targets (Part B) ---- */
+
+/* Two zero-size, invisible snap targets that consolidate the handoff: one at the
+   contact-sheet rest (the stage top) and one at the resolved grid (the morph's
+   release point, positioned from JS in measure() to MORPH_END of a viewport down so
+   it matches the progress that maps to 1). With `scroll-snap-type: y proximity` on the
+   document (set only while the motion stage is mounted), the browser GENTLY completes
+   a half-finished handoff to the nearer end when the scroll comes to rest mid-morph,
+   using its own scroll physics — never trapping the scroll (proximity, not mandatory),
+   respecting the input device and reduced motion. Below the resolved point there are
+   no snap targets, so the grid and the rest of the page scroll freely. */
+.snap {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+  scroll-snap-align: start;
+}
+
+.snapRest {
+  top: 0;
 }

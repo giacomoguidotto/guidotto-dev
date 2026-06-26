@@ -74,6 +74,15 @@ const MORPH_END = 0.8;
 const HERO_REST = 0.02;
 // Above this progress the resolved cards are navigable / focusable.
 const RESOLVE_AT = 0.85;
+// The positional morph fills the WHOLE pinned distance: each tile finishes landing
+// exactly as the sticky pin releases, so there is no "looks done but keep scrolling"
+// dead tail. The earlier morph completed its easing at ~0.72 of the pin, leaving the
+// last ~0.28 (≈22% of a viewport) as a hold where the grid read as done but the page
+// was still pinned — the "you're at .9, scroll a bit more" dangle. Filling the pin
+// removes that: the smoothstep's hard ease-out near the end reads as a settle without
+// any static hold, and the morph stays in motion right up to the release into normal
+// scroll. Pull this below 1 to trade a sliver of pre-release hold for a snappier morph.
+const MORPH_LANDING = 1;
 
 // Both the hero vessel and the proof card use a 1.4rem corner: it is CONSTANT
 // across the morph (the earlier "rounder vitrine radius" is dropped so rest matches
@@ -102,6 +111,18 @@ const smoothstep = (edge0: number, edge1: number, x: number): number => {
   const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
   return t * t * (3 - 2 * t);
 };
+
+const TWO_PI = Math.PI * 2;
+
+// The handoff "dance" envelope (see the DANCE block below). A bounded deviation that
+// each vessel rides OFF its straight FLIP line and back. It is gated by `m` (the same
+// eased morph parameter `drive()` uses), so it is a pure function of scroll progress —
+// it scrubs forwards/backwards with the scrollbar and never drifts on a clock.
+// Crucially it is ZERO at both ends and lands with ZERO velocity (the `(1 - m)` taper),
+// so the morph still settles on the EXACT FLIP target with no snap and the timing
+// window is unchanged — the path bends, the budget does not. Single hump early, then a
+// long calm settle: dance first, arrive composed.
+const danceEnv = (m: number): number => Math.sin(Math.PI * m) * (1 - m);
 
 // ---- the vitrine contact sheet placement (the hero's own scatter) ----
 
@@ -133,6 +154,73 @@ const VITRINE: Record<string, VitrinePlacement> = {
 const DEPTH_BLUR: Record<1 | 2 | 3, number> = { 1: 1.5, 2: 4, 3: 8 };
 const DEPTH_OPACITY: Record<1 | 2 | 3, number> = { 1: 0.9, 2: 0.74, 3: 0.52 };
 const DEPTH_SCALE: Record<1 | 2 | 3, number> = { 1: 1, 2: 0.97, 3: 0.92 };
+
+// ---- the handoff choreography (the "dance") ----
+//
+// Each vessel still FLIPs from its vitrine source to its landing target, but instead
+// of sliding the straight line between them it takes a curved excursion that returns
+// to the exact target (the deviation is enveloped to zero — see `danceEnv`). The shape
+// is read in each vessel's own frame: a unit vector `u` that points from its source
+// toward the point it is ATTRACTED to (only the DIRECTION matters — the magnitude is
+// normalised away), with `v = perp(u)` the swirl axis. For orbit angle
+// `a = spin * 2π * m`, the deviation is `amp·env·(cos a · u + sin a · v)`:
+//   - spin 0   -> a == 0 -> a pure BOW that bulges along `u` and eases straight back;
+//   - small ±spin -> the bulge starts along `u` then curls a quarter-ish turn toward
+//     `v` as it grows — a directional HOOK ("out, then bank");
+//   - spin ±1  -> a full pirouette (the offset rotates away from `u` early, so the
+//     lean reads weakly — avoid it when the START direction must be legible).
+//
+// The choreography (initial direction is what the eye locks onto, so each is aimed
+// explicitly rather than at a shared centre):
+//   - ginevra + scry are the upper pair: they SCISSOR. ginevra swings right and dips,
+//     scry swings left and lifts, so the two cross through each other before peeling
+//     off to their cells. Big amp so they actually overlap, not just lean.
+//   - orray + tempo are the lower pair: each throws a visible HOOK inward-and-up —
+//     orray out to the right then banking up, tempo out to the left then banking up.
+// (The showpiece weaves its own S on the way out — handled in `danceDelta`.)
+//
+// Amplitudes are a fraction of the pinned field WIDTH (responsive + tunable by eye, and
+// crossing scales with the layout); `attract` is a point in the pinned field (fraction)
+// — only its direction from the vessel matters.
+
+interface DanceRole {
+  /** Peak deviation off the straight FLIP line, as a fraction of the field width. */
+  readonly amp: number;
+  /** A point in the pinned field (fraction); only its DIRECTION from the vessel is used. */
+  readonly attract: { readonly x: number; readonly y: number };
+  /** Signed orbit turns over the morph: 0 = a pure bow, small ± = a directional hook. */
+  readonly spin: number;
+}
+
+// Keyed by project key (the four peers; the showpiece dances by a separate rule).
+const DANCE: Record<string, DanceRole> = {
+  // The upper pair scissor through each other: ginevra heads right and dips, scry heads
+  // left and lifts. Same-row attract points keep the start near-horizontal; the +spin
+  // banks ginevra down and scry up so they cross in the middle. Amp ~0.3·field so the
+  // two horizontal reaches together exceed their 0.24·field gap and the centres pass.
+  ginevra: { amp: 0.32, spin: 0.35, attract: { x: 1, y: 0.16 } },
+  scry: { amp: 0.32, spin: 0.35, attract: { x: 0, y: 0.27 } },
+  // The lower pair hook inward-and-up: orray right-then-up (−spin banks up), tempo
+  // left-then-up (+spin banks up, mirrored because its `u` points the other way).
+  orray: { amp: 0.12, spin: -0.4, attract: { x: 1, y: 0.69 } },
+  tempo: { amp: 0.12, spin: 0.4, attract: { x: 0, y: 0.67 } },
+};
+
+// The showpiece's set-aside weaves a single, wide, time-lopsided S on its way out: one
+// long first bow swings it ACROSS to the far side of the viewport, then it sweeps back
+// THROUGH centre (without pausing) into a short, small overshoot the other way before
+// settling as it aims below the pinned viewport. It is ONE continuous gesture, not two:
+// a sine over a WARPED clock crosses the centreline exactly once, at SHOW_SPLIT, and the
+// `(1 - m)` taper both shrinks the overshoot and lands it velocity-free (pixel-true).
+// Tunable by eye:
+//   - SHOW_SWAY_VW  nominal reach of the first bow, as a fraction of viewport width;
+//   - SHOW_SPLIT    the morph point where the bow sweeps back through centre (> 0.5, so
+//                   the first bow owns most of the time; raising it lengthens that bow).
+const SHOW_SWAY_VW = 0.6;
+const SHOW_SPLIT = 0.68;
+// Time warp exponent: m**SHOW_WARP maps SHOW_SPLIT -> 0.5, so sin(2π·warp) has its sole
+// interior zero (the centre sweep) at SHOW_SPLIT, with zero slope at m=0 (smooth start).
+const SHOW_WARP = Math.log(0.5) / Math.log(SHOW_SPLIT);
 
 const toPeerModel = (p: Project): TileModel => ({
   accent: p.accent,
@@ -170,6 +258,15 @@ const SHOWPIECE_MODEL: TileModel = {
 // (identity), so they simply ride the flow to the grid's end.
 interface Rig {
   readonly caption: HTMLElement | null;
+  // The handoff dance, precomputed once per measure (see the DANCE block). `danceUx/Uy`
+  // is the unit vector from this vessel's source toward the point it is attracted to;
+  // `danceAmp` is the peak deviation in px; `danceSpin` is the signed orbit turn count
+  // (0 = a pure bow). The showpiece reuses `danceAmp` as its S-curve sway and ignores
+  // the rest. All four are enveloped to zero at m=1, so the FLIP target is untouched.
+  readonly danceAmp: number;
+  readonly danceSpin: number;
+  readonly danceUx: number;
+  readonly danceUy: number;
   readonly depthBlur: number;
   readonly depthOpacity: number;
   readonly el: HTMLElement;
@@ -203,6 +300,33 @@ const vitrineWidth = (
   rem: number,
   vw: number
 ): number => clamp(9 * rem, 0.4 * vw, place.w * rem) * DEPTH_SCALE[place.depth];
+
+// Resolve a peer's dance basis from its DANCE role: the unit vector `u` pointing from
+// its vitrine source toward the point it is attracted to (in viewport px, so the field
+// fractions are scaled by the pin's own dimensions), its peak deviation in px, and its
+// orbit turns. The amplitude is a fraction of the FIELD WIDTH (not rem): the gap between
+// vessels is a fraction of the field, so a field-relative reach crosses the same on any
+// width — a fixed-rem reach would fail to close the gap on wide screens. A keyless /
+// unconfigured peer simply does not dance (amp 0).
+const peerDance = (
+  el: HTMLElement,
+  place: VitrinePlacement,
+  pinRect: DOMRect
+): { ux: number; uy: number; amp: number; spin: number } => {
+  const role = el.dataset.key ? DANCE[el.dataset.key] : undefined;
+  if (!role) {
+    return { ux: 0, uy: 0, amp: 0, spin: 0 };
+  }
+  const dx = (role.attract.x - place.x) * pinRect.width;
+  const dy = (role.attract.y - place.y) * pinRect.height;
+  const len = Math.hypot(dx, dy) || 1;
+  return {
+    ux: dx / len,
+    uy: dy / len,
+    amp: role.amp * pinRect.width,
+    spin: role.spin,
+  };
+};
 
 // Clear any prior transform, read the poster's untransformed rect, and pin the
 // tile's transform-origin to the poster centre so every scale pivots there (so a
@@ -249,6 +373,7 @@ const buildPeerRig = (
   const vCx = pinRect.left + place.x * pinRect.width;
   const vCy = pinRect.top + place.y * pinRect.height;
   const vW = vitrineWidth(place, rem, vw);
+  const dance = peerDance(el, place, pinRect);
   return {
     caption: child(el, "[data-caption]"),
     depthBlur: DEPTH_BLUR[place.depth],
@@ -264,6 +389,10 @@ const buildPeerRig = (
     tgtDx: 0,
     tgtDy: 0,
     tgtScale: 1,
+    danceUx: dance.ux,
+    danceUy: dance.uy,
+    danceAmp: dance.amp,
+    danceSpin: dance.spin,
   };
 };
 
@@ -328,6 +457,47 @@ const buildShowRig = (
     tgtDx: tgtCx - home.cx,
     tgtDy: tgtCy - home.cy,
     tgtScale,
+    // The showpiece weaves an S on the way out: `danceAmp` is its first-bow reach in
+    // px (a fraction of the viewport); the direction/spin fields are unused (its rule
+    // lives in `danceDelta`).
+    danceUx: 0,
+    danceUy: 0,
+    danceAmp: SHOW_SWAY_VW * vw,
+    danceSpin: 0,
+  };
+};
+
+// The dance deviation (viewport px) this vessel rides off its straight FLIP line at
+// morph parameter `m`. Enveloped to zero at both ends (so the FLIP source + target are
+// untouched and the settle is pixel-true). Two shapes:
+//   - the showpiece weaves ONE time-lopsided S — a sine over a warped clock so it swings
+//     across to the far side, sweeps back through centre once (at SHOW_SPLIT), and a
+//     `(1 - m)`-tapered short overshoot the other way before settling velocity-free;
+//   - every peer rides `amp·env·(cos a · u + sin a · v)` with `a = spin · 2π · m`,
+//     `u` toward its attractor and `v = perp(u)`: spin 0 is a pure bow toward the
+//     field, small ±spin a directional hook that banks toward `v` as it grows.
+const danceDelta = (rig: Rig, m: number): { x: number; y: number } => {
+  if (rig.danceAmp === 0) {
+    return { x: 0, y: 0 };
+  }
+  if (rig.showpiece) {
+    // One continuous S: sin(2π·warp) has a single interior zero at SHOW_SPLIT, so the
+    // vessel sweeps THROUGH centre once (no pause, no second gesture); `(1 - m)` tapers
+    // the trailing overshoot small and lands it with zero velocity.
+    const warp = m ** SHOW_WARP;
+    return { x: rig.danceAmp * (1 - m) * Math.sin(TWO_PI * warp), y: 0 };
+  }
+  const env = danceEnv(m);
+  if (env <= 0.0001) {
+    return { x: 0, y: 0 };
+  }
+  const r = rig.danceAmp * env;
+  const a = rig.danceSpin * TWO_PI * m;
+  const along = Math.cos(a) * r; // toward the attractor (u) and back
+  const across = Math.sin(a) * r; // the swirl (v = perp(u))
+  return {
+    x: along * rig.danceUx - across * rig.danceUy,
+    y: along * rig.danceUy + across * rig.danceUx,
   };
 };
 
@@ -342,10 +512,15 @@ const buildShowRig = (
 // the morph because the grid is browser-pinned (sticky) and the showpiece lives in
 // the pin. At p=1 the offset is the identity target (0 for peers), so when the grid
 // un-sticks the tile simply rides the flow — no per-frame compensation, no jitter.
+//
+// On top of that straight base each vessel rides a `danceDelta` excursion — a bow or a
+// pirouette that returns to exactly the target — so the handoff arrives composed but
+// gets there by dancing (see the DANCE block).
 const drive = (rig: Rig, p: number, lit: boolean) => {
-  const m = smoothstep(0, 0.72, p);
-  const dx = lerp(rig.srcDx, rig.tgtDx, m);
-  const dy = lerp(rig.srcDy, rig.tgtDy, m);
+  const m = smoothstep(0, MORPH_LANDING, p);
+  const delta = danceDelta(rig, m);
+  const dx = lerp(rig.srcDx, rig.tgtDx, m) + delta.x;
+  const dy = lerp(rig.srcDy, rig.tgtDy, m) + delta.y;
   const base = lerp(rig.srcScale, rig.tgtScale, m);
   const scale = lit ? base * HOVER_SCALE : base;
   rig.el.style.transform = `translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;
@@ -490,6 +665,9 @@ function MotionStage() {
   const copyRef = useRef<HTMLDivElement>(null);
   const batonRef = useRef<HTMLParagraphElement>(null);
   const labelRef = useRef<HTMLHeadingElement>(null);
+  // The resolved-grid scroll-snap target (Part B); positioned from JS in measure() to
+  // sit at the morph's release point.
+  const snapResolvedRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -531,6 +709,14 @@ function MotionStage() {
       // gridHeight + the morph distance.
       const gridHeight = grid.offsetHeight;
       stage.style.height = `${(gridHeight + MORPH_END * window.innerHeight).toFixed(2)}px`;
+      // Park the resolved scroll-snap target (Part B) at the morph's release — the
+      // same distance the progress reaches 1 — so the proximity snap lines up exactly
+      // with where the pin frees. Kept here so it tracks viewport resizes with the
+      // stage height; the rest target is static at the stage top (top: 0 in CSS).
+      const snapResolved = snapResolvedRef.current;
+      if (snapResolved) {
+        snapResolved.style.top = `${(MORPH_END * window.innerHeight).toFixed(2)}px`;
+      }
       // The grid is sticky-pinned at top: 0 during the morph; its current container
       // top lets buildPeerRig recover each cell's PINNED viewport home regardless of
       // the scroll measure() runs at.
@@ -708,6 +894,15 @@ function MotionStage() {
 
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", remeasure);
+    // Enable the handoff's proximity scroll-snap (Part B). The document is the
+    // scroller, so the snap type lives on the root element; it is scoped to the motion
+    // stage's lifetime (restored on cleanup) and is `proximity` — not `mandatory` — so
+    // it only assists a half-finished handoff and never traps free scroll. Reduced
+    // motion never reaches here (the motion stage is gated behind no-preference), and
+    // the snap uses the browser's own scroll physics, so there is no second animator.
+    const rootStyle = document.documentElement.style;
+    const prevSnapType = rootStyle.scrollSnapType;
+    rootStyle.scrollSnapType = "y proximity";
     // The coordinator listens on the whole stage so it catches both the in-flow grid
     // peers and the absolutely-placed showpiece in the pin's vitrine layer.
     stage.addEventListener("pointerover", onOver);
@@ -716,6 +911,15 @@ function MotionStage() {
     stage.addEventListener("focusout", onFocusOut);
     // The grid box (and so the scatter deltas) can shift after web fonts swap in or
     // any reflow; re-measure so the FLIP stays true.
+    //
+    // The observer watches only the grid, NOT the finale below. measure() reads the
+    // finale's [data-finale-landing] rect live, but caches it; when the finale's
+    // <LiveInstrument> lazy-mounts on scroll-into-view it can reflow that slot and
+    // leave the cached rect stale. That is harmless by construction: buildShowRig
+    // uses only the slot's scroll-stable left/width, and the morph resolves within
+    // the first viewport — long before the finale (and its lazy instrument) is
+    // reached. If that timing contract is ever broken (a longer morph, or eagerly
+    // mounting the scene), observe the finale here too so the set-aside re-aims.
     const observer = new ResizeObserver(remeasure);
     observer.observe(grid);
 
@@ -744,6 +948,7 @@ function MotionStage() {
       pin.style.removeProperty("--live-accent");
       pin.removeAttribute("data-settling");
       stage.style.height = "";
+      rootStyle.scrollSnapType = prevSnapType;
     };
   }, []);
 
@@ -802,6 +1007,18 @@ function MotionStage() {
           </ul>
         </section>
       </div>
+
+      {/* the two handoff snap points (Part B): invisible, zero-size proximity snap
+          targets — one at the contact-sheet rest (the stage top) and one at the
+          resolved grid (the morph's release, positioned from JS in measure() so it
+          tracks the pin distance). With `scroll-snap-type: y proximity` on the
+          document (set only while the motion stage is mounted), the browser's own
+          scroll physics gently completes a half-finished handoff to the nearer end
+          when the scroll comes to rest mid-morph, and never traps free scroll —
+          below the resolved point there are no snap targets, so the grid and the rest
+          of the page scroll normally. */}
+      <div className={`${styles.snap} ${styles.snapRest}`} />
+      <div className={styles.snap} ref={snapResolvedRef} />
     </div>
   );
 }

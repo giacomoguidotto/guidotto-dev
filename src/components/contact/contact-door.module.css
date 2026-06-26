@@ -13,8 +13,21 @@
    the fields cascade in. Everything collapses to an instant show under
    prefers-reduced-motion at the foot of this file. */
 
-/* the stage used by the standalone preview route (mirrors the hero field, but
-   grows with content instead of clipping to one viewport) */
+/* the settled foot of the page: it continues the dark floor the denouement
+   hands down (--stage-deep, no restarted bright pool), with a single soft cool
+   bloom rising from beneath the door so the one loud CTA sits in a pool of blue
+   light rather than on a band. The bloom is a brighter cool blue than the dark
+   --stage-* floor (which tops out too dark to read as light) and is centred low
+   (50% 66%) so it reads as coming from under the closed pill.
+
+   The content is vertically CENTRED, so the door — pill or open card — sits on
+   the midline. The card growing taller therefore re-centres about that midline
+   rather than dropping below it. The one hazard of centring a growing element is
+   a card taller than the foot: its top would spill UP past the stage and drag the
+   preceding section into view (and the open-focus would scroll up to chase it).
+   That is foreclosed at the source — the open card is capped to the viewport
+   (.door[open] max-height) and scrolls its own form — so a centred card can never
+   exceed the foot it is centred in. */
 .stage {
   display: grid;
   place-items: center;
@@ -22,12 +35,14 @@
   min-height: 100svh;
   padding: clamp(2rem, 8vh, 6rem) 1.5rem;
   color: var(--ivory);
-  background: radial-gradient(
-    130% 105% at 50% 16%,
-    var(--stage-1) 0%,
-    var(--stage-2) 52%,
-    var(--stage-3) 100%
-  );
+  background:
+    radial-gradient(
+      60% 48% at 50% 66%,
+      color-mix(in oklch, oklch(0.4 0.085 256) 58%, transparent) 0%,
+      color-mix(in oklch, oklch(0.4 0.085 256) 22%, transparent) 40%,
+      transparent 74%
+    ),
+    var(--stage-deep);
 }
 
 .contact {
@@ -118,6 +133,13 @@
   cursor: default;
 }
 
+/* Open, the header is an inert title, not a toggle, and focus has moved on to
+   the first field. Suppressing its focus ring keeps the pill-radius (999px)
+   outline from ever drawing over the card and giving the pill->card morph away. */
+.door[open] .summary:focus-visible {
+  outline: none;
+}
+
 .summaryDot {
   width: 0.5rem;
   height: 0.5rem;
@@ -155,6 +177,19 @@
 .panel {
   padding: 0 1.7rem 1.7rem;
   text-align: left;
+}
+
+/* When the card is open, the form area is capped to (viewport - the title row)
+   and scrolls its own overflow, so the whole card — title row plus form — can
+   never be taller than the foot it is centred in. That is what keeps a centred
+   card from spilling its top up over the preceding section on a short viewport.
+   The cap is generous (~90svh), so on any normal viewport the form is well within
+   it and nothing scrolls; it only engages when the window is genuinely too short
+   to hold the open form. */
+.door[open] .panel {
+  max-height: calc(90svh - 5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .form {

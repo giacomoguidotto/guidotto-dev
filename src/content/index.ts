@@ -121,6 +121,7 @@ export interface RailLink {
 export interface CtaContent {
   readonly button: string;
   readonly confirmation: string;
+  readonly confirmationTitle: string;
   readonly fields: {
     readonly name: string;
     readonly email: string;
@@ -274,7 +275,8 @@ export const content: Content = {
       message: "Message",
     },
     send: "Send",
-    confirmation: "Got it. I'll get back to you soon.",
+    confirmationTitle: "Got it!",
+    confirmation: "I'll get back to you soon.",
     rail: [
       { label: "LinkedIn", href: LINKEDIN },
       { label: "GitHub", href: GITHUB },

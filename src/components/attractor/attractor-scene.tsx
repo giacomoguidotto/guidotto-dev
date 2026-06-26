@@ -32,7 +32,7 @@ import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { type BloomEffect, KernelSize } from "postprocessing";
-import { useMemo, useRef } from "react";
+import { memo, useMemo, useRef } from "react";
 import {
   AdditiveBlending,
   type BufferGeometry,
@@ -139,7 +139,8 @@ interface SceneProps {
 interface CanvasProps extends SceneProps {
   /** False while the finale is off-screen — pauses the frame loop. */
   readonly active: boolean;
-  /** Drop to the static tier when the GL context is lost (driver reset / OOM). */
+  /** Signal a lost GL context (driver reset / OOM / off-screen reclaim) so the
+   *  orchestrator can recover by remounting a fresh Canvas. */
   readonly onContextLost: () => void;
 }
 
@@ -352,7 +353,20 @@ function buildScratch(data: FinaleData, accentColor: Color): Scratch {
   };
 }
 
-function SceneContents({ accent, controller, data }: SceneProps) {
+// Memoised so it NEVER re-renders after mount. Two reasons it must not: (1) its
+// props (accent, controller, data) are stable for the scene's whole life, so a
+// re-render would only ever rebuild the same tree; (2) — load-bearing —
+// @react-three/postprocessing's `<Bloom>` wrapper computes a useMemo key as
+// `JSON.stringify(props)`, and under React 19 the `ref` we attach is a real prop:
+// once `bloom.current` holds the BloomEffect (a circular three graph), ANY
+// re-render of <Bloom> throws "Converting circular structure to JSON". Freezing
+// this subtree means the only render is the initial mount (ref still null), so a
+// parent re-render (the `active`/`frameloop` flip on scroll) can never trip it.
+const SceneContents = memo(function SceneContents({
+  accent,
+  controller,
+  data,
+}: SceneProps) {
   const tubeGeom = useRef<BufferGeometry>(null);
   const tubeMat = useRef<MeshBasicMaterial>(null);
   const motesGeom = useRef<BufferGeometry>(null);
@@ -369,7 +383,16 @@ function SceneContents({ accent, controller, data }: SceneProps) {
     () => buildScratch(data, accentColor),
     [data, accentColor]
   );
-  const clock = useRef<Clock>({ elapsed: 0, convergedAt: -1 });
+  // On a fresh mount the timeline plays from zero (motes pop in, the console fades
+  // up as a staged beat). On a REMOUNT after a recovered context loss the autoplay
+  // has already finished (or the visitor scrubbed, which also clears it), so start
+  // past the staged entrance: the rebuilt scene appears already settled — motes
+  // shown, console up, resting on wherever the controller left progress — instead
+  // of replaying its power-on each time the finale is re-approached.
+  const clock = useRef<Clock>({
+    elapsed: controller.autoplayActive ? 0 : GAUGE_IN_MS + CONSOLE_FADE_MS,
+    convergedAt: -1,
+  });
 
   useFrame((_state, delta) => {
     const now = performance.now();
@@ -515,7 +538,7 @@ function SceneContents({ accent, controller, data }: SceneProps) {
       </EffectComposer>
     </>
   );
-}
+});
 
 export default function AttractorScene({
   accent,
@@ -528,8 +551,11 @@ export default function AttractorScene({
     gl.domElement.addEventListener(
       "webglcontextlost",
       (event) => {
-        // A lost context (GPU switch, driver reset, OOM) is a DOM event, not a
-        // React error — the SceneBoundary never sees it. Fall to the static tier.
+        // A lost context (GPU switch, driver reset, OOM, or the browser reclaiming
+        // this canvas while it sits off-screen) is a DOM event, not a React error —
+        // the SceneBoundary never sees it. preventDefault keeps the canvas alive and
+        // signals intent to restore; LiveInstrument recovers by remounting a fresh
+        // Canvas once the finale is back on-screen.
         event.preventDefault();
         onContextLost();
       },

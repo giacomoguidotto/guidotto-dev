@@ -96,5 +96,5 @@ Section label (mono): `SELECTED WORK`. Four peers, 2x2. No badges.
 - **Button:** `Get in touch`
 - **Form fields:** Name, Email, Message
 - **Send button:** `Send`
-- **Confirmation:** Got it. I'll get back to you soon.
+- **Confirmation:** Title `Got it!` (replaces `Get in touch` once sent) · body `I'll get back to you soon.`
 - **Quiet rail:** `LinkedIn` · `GitHub` · `X` (icons only, no label)
