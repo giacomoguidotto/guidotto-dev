@@ -1,3 +1,5 @@
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
 import { Fraunces, JetBrains_Mono } from "next/font/google";
 import { content } from "~/content";
@@ -100,6 +102,8 @@ export default function RootLayout({
       <body className={`${fraunces.variable} ${jetbrainsMono.variable}`}>
         {children}
         <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
