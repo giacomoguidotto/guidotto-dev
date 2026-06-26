@@ -13,9 +13,12 @@
    the fields cascade in. Everything collapses to an instant show under
    prefers-reduced-motion at the foot of this file. */
 
-/* the cool stage that carries the CTA close (mirrors the hero field, but grows
-   with content instead of clipping to one viewport). It backs the contact
-   section at the foot of the composed home page. */
+/* the settled foot of the page: it continues the dark floor the denouement
+   hands down (--stage-deep, no restarted bright pool), with a single soft cool
+   bloom rising from beneath the door so the one loud CTA sits in a pool of blue
+   light rather than on a band. The bloom is a brighter cool blue than the dark
+   --stage-* floor (which tops out too dark to read as light) and is centred low
+   (50% 66%) so it reads as coming from under the closed pill. */
 .stage {
   display: grid;
   place-items: center;
@@ -23,12 +26,14 @@
   min-height: 100svh;
   padding: clamp(2rem, 8vh, 6rem) 1.5rem;
   color: var(--ivory);
-  background: radial-gradient(
-    130% 105% at 50% 16%,
-    var(--stage-1) 0%,
-    var(--stage-2) 52%,
-    var(--stage-3) 100%
-  );
+  background:
+    radial-gradient(
+      60% 48% at 50% 66%,
+      color-mix(in oklch, oklch(0.4 0.085 256) 58%, transparent) 0%,
+      color-mix(in oklch, oklch(0.4 0.085 256) 22%, transparent) 40%,
+      transparent 74%
+    ),
+    var(--stage-deep);
 }
 
 .contact {
