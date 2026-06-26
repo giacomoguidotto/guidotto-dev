@@ -13,11 +13,15 @@
 //   - it picks the tier:
 //       full     — the R3F scene (capable + motion-welcome);
 //       static   — the data-driven 2D butterfly (no WebGL, motion fine), or the
-//                  drop-target if the live scene throws / loses its context;
+//                  drop-target if the live scene throws (a React error);
 //       poster   — the baked still <img> (reduced motion, or a failed asset load):
 //                  the true floor, which fetches/computes nothing and never a hole.
 //   - while the finale is off-screen it pauses the scene's frame loop, so the
-//     perpetual comet/bloom never burns frames the visitor cannot see.
+//     perpetual comet/bloom never burns frames the visitor cannot see;
+//   - a LOST WebGL context (the browser reclaims an off-screen canvas's GPU
+//     context on scroll-away) is recovered by remounting a fresh Canvas once the
+//     finale is back on-screen — not a permanent drop; only a device that cannot
+//     hold a context (repeated fast-fails) finally settles for the static tier.
 //
 // The HUD and scrubber render as DOM overlays beside the canvas, sharing the one
 // mutable controller with the scene (see controller.ts).
@@ -48,6 +52,13 @@ const AttractorScene = dynamic(() => import("./attractor-scene"), {
 
 const POSTER_LABEL =
   "The recovered Lorenz attractor, converged into its butterfly.";
+
+// A WebGL context lost off-screen is recovered by remounting a fresh Canvas (see
+// `generation` below). Guard against a device that genuinely cannot hold one: if a
+// freshly remounted scene dies again within this window it counts as a fast-fail,
+// and a few in a row drop to the static floor instead of remounting forever.
+const RECOVER_FASTFAIL_MS = 4000;
+const RECOVER_FASTFAIL_LIMIT = 3;
 
 type Mode = "full" | "static";
 type Status = "idle" | "loading" | "ready" | "failed";
@@ -119,6 +130,17 @@ export function LiveInstrument() {
   const [mode, setMode] = useState<Mode>("full");
   // Whether the scene should render frames — false while the finale is off-screen.
   const [active, setActive] = useState(true);
+  // The live scene's mount generation. A lost WebGL context (browsers reclaim the
+  // GPU context of an off-screen canvas on scroll-away) is recovered by REMOUNTING
+  // a fresh Canvas — bumping this key — rather than demoting to the static still
+  // permanently. The rebuild waits until the finale is back on-screen, so a context
+  // dropped while parked off-screen heals on return instead of churning unseen.
+  const [generation, setGeneration] = useState(0);
+  const [contextLost, setContextLost] = useState(false);
+  const recoverGuard = useRef({
+    fastFails: 0,
+    lastAt: Number.NEGATIVE_INFINITY,
+  });
 
   // Capability: prefers-reduced-motion, kept live (a visitor can toggle it).
   useEffect(() => {
@@ -189,6 +211,31 @@ export function LiveInstrument() {
     setMode("static");
   }, []);
 
+  // A lost context is recoverable — just flag it; the effect below rebuilds the
+  // scene when (and only when) the finale is on-screen, so we never spin up a fresh
+  // context the visitor cannot see (which the browser would likely reclaim again).
+  const handleContextLost = useCallback(() => setContextLost(true), []);
+
+  useEffect(() => {
+    if (!(contextLost && active)) {
+      return;
+    }
+    const now = performance.now();
+    const guard = recoverGuard.current;
+    // A rebuild that survives a while resets the streak; one that dies almost
+    // immediately is a fast-fail. Enough fast-fails in a row means this device
+    // cannot hold a context, so settle for the static floor rather than loop.
+    guard.fastFails =
+      now - guard.lastAt < RECOVER_FASTFAIL_MS ? guard.fastFails + 1 : 0;
+    guard.lastAt = now;
+    setContextLost(false);
+    if (guard.fastFails >= RECOVER_FASTFAIL_LIMIT) {
+      failToStatic();
+      return;
+    }
+    setGeneration((g) => g + 1);
+  }, [contextLost, active, failToStatic]);
+
   const data = dataRef.current;
   const controller = controllerRef.current;
   const ready = status === "ready" && data && controller;
@@ -210,7 +257,8 @@ export function LiveInstrument() {
                   active={active}
                   controller={controller}
                   data={data}
-                  onContextLost={failToStatic}
+                  key={generation}
+                  onContextLost={handleContextLost}
                 />
               </SceneBoundary>
             ) : (
