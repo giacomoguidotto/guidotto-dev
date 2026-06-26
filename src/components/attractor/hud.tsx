@@ -17,8 +17,14 @@
 // costs no re-renders. The loss path itself is static geometry built once from the
 // real per-epoch numbers; only how much of it is revealed animates.
 //
+// The HUD also FOLLOWS the progress bar into view: the same rAF fades the whole
+// readout in off the scene's `gaugeReveal` (the parameters + loss are the second
+// beat of the console's staged entrance), so they arrive already alive — their
+// values have begun settling by the time they become visible.
+//
 // In the static / reduced-motion tier there is no animation loop: the converged
-// snapshot's knobs are written once and the whole loss curve is revealed and held.
+// snapshot's knobs are written once, the whole loss curve is revealed and held,
+// and the readout shows at full opacity at once (no `entering` fade).
 
 import { useEffect, useId, useMemo, useRef } from "react";
 import type { Showpiece } from "~/showpiece/lorenz-forward";
@@ -108,6 +114,8 @@ export function Hud({
   const sigmaDot = useRef<HTMLSpanElement>(null);
   const rhoDot = useRef<HTMLSpanElement>(null);
   const betaDot = useRef<HTMLSpanElement>(null);
+  // The readout shell, faded in off `gaugeReveal` (the second console beat).
+  const shell = useRef<HTMLDivElement>(null);
   // The rect that clips the loss path; its width (0..100) is how much of the
   // descending curve has been revealed so far.
   const reveal = useRef<SVGRectElement>(null);
@@ -140,12 +148,16 @@ export function Hud({
     if (!live) {
       paintKnobs(showpiece.snapshotCount - 1);
       revealTo(1);
+      // No `entering` class in this tier; clear any staged-entrance value left by
+      // a live phase that just dropped to static, so the readout shows at rest.
+      shell.current?.style.removeProperty("--enter");
       return;
     }
 
     let raf = 0;
     let lastIndex = -1;
     let lastProgress = -1;
+    let lastGauge = -1;
     const tick = () => {
       // The loss curve reveals continuously (it traces the descent smoothly), so
       // it follows raw progress every frame it moves.
@@ -160,6 +172,15 @@ export function Hud({
         lastIndex = index;
         paintKnobs(index);
       }
+      // The staged entrance: the whole readout fades + settles in off the scene's
+      // gaugeReveal (CSS reads `--enter` for both opacity and the lift).
+      const gauge = controller.gaugeReveal;
+      if (gauge !== lastGauge) {
+        lastGauge = gauge;
+        if (shell.current) {
+          shell.current.style.setProperty("--enter", String(gauge));
+        }
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -167,7 +188,10 @@ export function Hud({
   }, [controller, live, showpiece]);
 
   return (
-    <div className={styles.hud}>
+    <div
+      className={live ? `${styles.hud} ${styles.entering}` : styles.hud}
+      ref={shell}
+    >
       <div className={styles.hudParams}>
         <span className={styles.hudLabel}>{parametersLabel}</span>
         <Knob dotRef={sigmaDot} symbol="σ" />

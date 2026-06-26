@@ -149,6 +149,12 @@
 /* the bottom control strip: the HUD row and the scrubber. Non-interactive so a
    drag over it still orbits the scene; only the scrubber re-enables input. */
 .console {
+  /* the staged entrance's drift distance: each element rises this far as it fades
+     in (the scene's rAF writes a per-element `--enter`, 0 -> 1; the elements below
+     read it for both opacity and the lift). Kept small — a subtle settle, not a
+     slide. */
+  --console-rise: 0.5rem;
+
   position: absolute;
   inset: auto 0 0 0;
   z-index: 1;
@@ -168,6 +174,16 @@
      two titles then sit on the same top line (the alignment the finale wants). */
   align-items: stretch;
   justify-content: space-between;
+}
+
+/* the live tier's HUD enters as the SECOND beat of the console's staged fade-in
+   (the progress bar leads): it starts hidden and lifted here, and the scene's rAF
+   raises `--enter` (0 -> 1) off `gaugeReveal` to fade + settle it into place. The
+   static / reduced tier never gets this class, so the readout shows at rest at
+   once. */
+.entering {
+  opacity: var(--enter, 0);
+  transform: translateY(calc((1 - var(--enter, 0)) * var(--console-rise)));
 }
 
 .hudParams {
@@ -288,6 +304,12 @@
   align-items: center;
   height: 1.1rem;
   pointer-events: auto;
+  /* the progress bar LEADS the console's staged entrance: it starts hidden and
+     lifted, and the scene's rAF raises `--enter` (0 -> 1) off `controlReveal` to
+     fade + settle it in (and gates pointer input until it is mostly present). It
+     only ever renders in the live tier, so it always plays this fade. */
+  opacity: var(--enter, 0);
+  transform: translateY(calc((1 - var(--enter, 0)) * var(--console-rise)));
 }
 
 .scrubberTrack {

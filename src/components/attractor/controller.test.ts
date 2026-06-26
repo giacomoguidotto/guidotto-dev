@@ -47,6 +47,8 @@ describe("createController", () => {
     const controller = createController(37);
     expect(controller.progress).toBe(0);
     expect(controller.reveal).toBe(0);
+    expect(controller.controlReveal).toBe(0);
+    expect(controller.gaugeReveal).toBe(0);
     expect(controller.autoplayActive).toBe(true);
     expect(controller.userScrubbing).toBe(false);
     expect(controller.snapshotCount).toBe(37);

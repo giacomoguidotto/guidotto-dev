@@ -19,6 +19,12 @@
 //   - additive bloom swells to a peak at convergence, then eases back;
 //   - a comet then traces the converged attractor forever (a fading additive tail);
 //   - drag orbits the genuinely-3D object; depth fog dims the far lobe.
+//
+// The same timeline also conducts the DOM console's entrance: stepTiming writes
+// `controlReveal` then `gaugeReveal` onto the controller, and the Scrubber + Hud
+// (separate rAF readers outside the Canvas) fade in off those — the progress bar
+// as the cloud assembles, the parameters + loss a beat later. The console is not
+// rendered here; the scene only conducts when it arrives.
 
 "use client";
 
@@ -61,6 +67,16 @@ const INTRO_MS = 2200; // motes pop in — a few, then a flurry (see MOTE_CRESCE
 const HOLD_MS = 400; // a beat on the assembled noisy cloud
 const PLAY_MS = 7400; // uncurl 0 -> 1, fast off the tangle then easing to rest
 const PEAK_DECAY_MS = 1500; // bloom eases back after convergence
+// Staged entrance of the DOM console (the progress bar, then the gauges). The HUD
+// does not arrive with the canvas: it fades in as a beat once the data cloud has
+// assembled, so the instrument reads as powering on rather than appearing whole.
+const CONSOLE_FADE_MS = 750; // the per-element fade-in span
+// The progress bar LEADS: it fades in as the cloud finishes assembling, so the
+// (empty) bar is in place, ready to fill, as the uncurl begins.
+const CONTROL_IN_MS = INTRO_MS - 300;
+// The parameters + loss gauges FOLLOW a beat later — they light up just as the
+// training (and so their settling values) begins, arriving already alive.
+const GAUGE_IN_MS = INTRO_MS + 450;
 // Clamp the per-frame timeline step, so a pause (off-screen frame loop) or a
 // throttled background tab never makes the autoplay leap on resume.
 const MAX_FRAME_MS = 50;
@@ -158,6 +174,18 @@ function stepTiming(controller: FinaleController, clock: Clock, dtMs: number) {
   clock.elapsed += Math.min(dtMs, MAX_FRAME_MS);
   const elapsed = clock.elapsed;
   controller.reveal = smoothstep(0, INTRO_MS, elapsed);
+  // The console enters as a staged beat after the cloud: the progress bar first,
+  // the parameters + loss gauges a beat later (their readers fade to these).
+  controller.controlReveal = smoothstep(
+    CONTROL_IN_MS,
+    CONTROL_IN_MS + CONSOLE_FADE_MS,
+    elapsed
+  );
+  controller.gaugeReveal = smoothstep(
+    GAUGE_IN_MS,
+    GAUGE_IN_MS + CONSOLE_FADE_MS,
+    elapsed
+  );
   if (controller.autoplayActive) {
     const playElapsed = elapsed - INTRO_MS - HOLD_MS;
     if (playElapsed > 0) {

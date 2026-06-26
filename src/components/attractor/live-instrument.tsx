@@ -96,6 +96,10 @@ class SceneBoundary extends Component<BoundaryProps, { failed: boolean }> {
 function freezeConverged(controller: FinaleController): void {
   controller.progress = 1;
   controller.reveal = 1;
+  // The console never plays its staged entrance in these tiers (there is no scene
+  // conducting it); hold it fully revealed so the readouts show at once.
+  controller.controlReveal = 1;
+  controller.gaugeReveal = 1;
   controller.autoplayActive = false;
 }
 

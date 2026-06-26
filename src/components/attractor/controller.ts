@@ -13,6 +13,14 @@ export interface FinaleController {
   /** Scene advances `progress` while true; cleared once the play-through ends
    *  or the visitor takes over the scrubber (autoplay is a once-on-view beat). */
   autoplayActive: boolean;
+  /** The console's staged entrance — the scene fades it in as a beat AFTER the
+   *  data cloud assembles, not all at once with the canvas. The progress bar
+   *  leads (`controlReveal`) and the parameters + loss gauges follow a beat later
+   *  (`gaugeReveal`). The Scrubber and Hud read these on their own rAF and write
+   *  opacity straight to the DOM (no re-render). Static / frozen tiers hold both
+   *  at 1 (see freezeConverged). */
+  controlReveal: number;
+  gaugeReveal: number;
   /** Training progress, 0 (epoch 0) -> 1 (converged). Scene + scrubber write. */
   progress: number;
   /** Observation motes pop in, 0 -> 1 (scene writes during the intro beat). */
@@ -37,6 +45,8 @@ export function createController(
     autoplayActive: true,
     userScrubbing: false,
     reveal: 0,
+    controlReveal: 0,
+    gaugeReveal: 0,
     settleIndex,
     snapshotCount,
   };
