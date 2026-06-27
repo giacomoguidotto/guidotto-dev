@@ -18,7 +18,9 @@
 //     stub, then decelerating to rest on the settled butterfly;
 //   - additive bloom swells to a peak at convergence, then eases back;
 //   - a comet then traces the converged attractor forever (a fading additive tail);
-//   - drag orbits the genuinely-3D object; depth fog dims the far lobe.
+//   - drag orbits the genuinely-3D object (one finger spins it on touch, two
+//     fingers give full pitch+spin; a vertical swipe still scrolls the page);
+//     depth fog dims the far lobe.
 //
 // The same timeline also conducts the DOM console's entrance: stepTiming writes
 // `controlReveal` then `gaugeReveal` onto the controller, and the Scrubber + Hud
@@ -29,10 +31,10 @@
 "use client";
 
 import { OrbitControls } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { type BloomEffect, KernelSize } from "postprocessing";
-import { memo, useMemo, useRef } from "react";
+import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import {
   AdditiveBlending,
   type BufferGeometry,
@@ -99,6 +101,52 @@ const MOTE_CRESCENDO = 2.2;
 // and a longer, gentler glide to rest as the butterfly settles.
 const CONVERGE_DECEL = 2.6;
 const CONVERGED = 0.999;
+
+// Per-aspect camera framing (#30). The instrument is a wide 16/11 box on desktop
+// but a tall portrait frame on the phone (attractor.module.css). The Lorenz
+// butterfly is wider-than-tall (two lobes around the vertical axis), so a portrait
+// frame would strand it small unless the camera re-aims — so the portrait preset
+// dollies in and tilts to a three-quarter default that fills the tall frame, while
+// the landscape preset is the EXACT desktop framing (so desktop is untouched). The
+// CameraRig picks between them off the live frame aspect, so a phone rotated to
+// landscape reframes cleanly with no remount.
+const CAMERA_LANDSCAPE = { position: [0, 4, 72], fov: 38 } as const;
+const CAMERA_PORTRAIT = { position: [18, 11, 58], fov: 40 } as const;
+
+// The phone gets a higher DPR cap: its canvas is physically small (so even native
+// DPR is a modest pixel budget) and the object now fills the frame, so it wants to
+// read crisp; desktop stays capped lower to protect large retina/4K canvases.
+const PHONE_QUERY = "(max-width: 40rem)";
+const DPR_PHONE: [number, number] = [1, 2];
+const DPR_DEFAULT: [number, number] = [1, 1.75];
+
+// One soft buzz at the convergence peak — the "one loud answer" beat (#30). Android
+// fires it; iOS Safari exposes no Web Vibration API, so the call simply no-ops
+// (silent on iPhone, no fragile fallback). Skipped under reduced motion (the live
+// scene does not even mount in that tier, but guard anyway for a mid-session toggle).
+const CONVERGENCE_BUZZ_MS = 15;
+
+function isPhoneViewport(): boolean {
+  return (
+    typeof window !== "undefined" && window.matchMedia(PHONE_QUERY).matches
+  );
+}
+
+function fireConvergenceHaptic(): void {
+  if (
+    typeof navigator === "undefined" ||
+    typeof navigator.vibrate !== "function"
+  ) {
+    return;
+  }
+  if (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    return;
+  }
+  navigator.vibrate(CONVERGENCE_BUZZ_MS);
+}
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 const smoothstep = (a: number, b: number, x: number): number => {
@@ -353,6 +401,32 @@ function buildScratch(data: FinaleData, accentColor: Color): Scratch {
   };
 }
 
+// Re-aims the default camera off the live frame aspect (#30): the desktop framing
+// when the frame is landscape, a dollied-in three-quarter framing when it is
+// portrait (the phone). It writes camera.position/fov directly; OrbitControls
+// re-derives its spherical from camera.position every update, so when idle it
+// simply adopts the new framing (and a phone rotated mid-session reframes without a
+// remount). Runs in a layout effect, before the first painted frame, so there is no
+// landscape flash on a portrait phone.
+function CameraRig() {
+  const camera = useThree((state) => state.camera);
+  const width = useThree((state) => state.size.width);
+  const height = useThree((state) => state.size.height);
+  const portrait = width > 0 && height > 0 && width < height;
+
+  useLayoutEffect(() => {
+    const view = portrait ? CAMERA_PORTRAIT : CAMERA_LANDSCAPE;
+    const [x, y, z] = view.position;
+    camera.position.set(x, y, z);
+    if ("isPerspectiveCamera" in camera) {
+      camera.fov = view.fov;
+      camera.updateProjectionMatrix();
+    }
+  }, [portrait, camera]);
+
+  return null;
+}
+
 // Memoised so it NEVER re-renders after mount. Two reasons it must not: (1) its
 // props (accent, controller, data) are stable for the scene's whole life, so a
 // re-render would only ever rebuild the same tree; (2) — load-bearing —
@@ -393,6 +467,11 @@ const SceneContents = memo(function SceneContents({
     elapsed: controller.autoplayActive ? 0 : GAUGE_IN_MS + CONSOLE_FADE_MS,
     convergedAt: -1,
   });
+  // The convergence buzz fires once, and only for a genuine play-through: armed
+  // when this mount starts mid-autoplay (a fresh first view), disarmed otherwise —
+  // so a context-loss remount that rebuilds an already-converged scene never
+  // re-buzzes the moment it appears.
+  const hapticArmed = useRef(controller.autoplayActive);
 
   useFrame((_state, delta) => {
     const now = performance.now();
@@ -403,6 +482,12 @@ const SceneContents = memo(function SceneContents({
     // cleanly the first time it appears.
     if (converged && clock.current.convergedAt < 0) {
       clock.current.convergedAt = now;
+      // One soft buzz on the convergence peak — the spectacle's single loudest
+      // moment (Android only; silent on iOS; off under reduced motion).
+      if (hapticArmed.current) {
+        hapticArmed.current = false;
+        fireConvergenceHaptic();
+      }
     }
     stepMotes(
       motesGeom.current,
@@ -429,6 +514,7 @@ const SceneContents = memo(function SceneContents({
   return (
     <>
       <fog args={[FOG_COLOR, FOG_NEAR, FOG_FAR]} attach="fog" />
+      <CameraRig />
       <OrbitControls
         dampingFactor={0.08}
         enableDamping
@@ -438,10 +524,13 @@ const SceneContents = memo(function SceneContents({
         minPolarAngle={Math.PI * 0.14}
         rotateSpeed={0.55}
         target={[0, 0, 0]}
-        // One finger scrolls the page (the canvas keeps touch-action: pan-y);
-        // two fingers orbit. With ONE left unset, a single-finger touch falls
-        // through OrbitControls to a no-op, so a swipe never traps the page.
-        touches={{ TWO: TOUCH.ROTATE }}
+        // One finger: a HORIZONTAL drag spins the butterfly (azimuth — the reward),
+        // while a VERTICAL swipe falls through to the page scroll because the canvas
+        // keeps `touch-action: pan-y` (the browser claims a vertical-led gesture
+        // before OrbitControls ever sees it). Two fingers give full pitch+spin. The
+        // page is never trapped: a vertical swipe — or anywhere outside the canvas —
+        // always scrolls.
+        touches={{ ONE: TOUCH.ROTATE, TWO: TOUCH.ROTATE }}
       />
 
       <points>
@@ -563,17 +652,24 @@ export default function AttractorScene({
     );
   };
 
+  // Tune DPR for the phone (#30): a small physical canvas wants a crisper cap; a
+  // large desktop canvas wants a lower one. Read once at mount — the camera reframes
+  // live (CameraRig), but the pixel-ratio cap is a fixed Canvas property.
+  const phone = isPhoneViewport();
+
   return (
     <Canvas
       camera={{ position: [0, 4, 72], fov: 38, near: 0.1, far: 220 }}
       className={styles.sceneCanvas}
-      dpr={[1, 1.75]}
+      dpr={phone ? DPR_PHONE : DPR_DEFAULT}
       // Pause rendering while the finale is off-screen (the perpetual comet/bloom
       // must not burn frames the visitor cannot see).
       frameloop={active ? "always" : "never"}
       gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
       onCreated={handleCreated}
-      // One-finger gestures scroll the page; orbit is two-finger (OrbitControls).
+      // A one-finger HORIZONTAL drag orbits (azimuth); a one-finger VERTICAL swipe
+      // scrolls the page through the instrument; two fingers give full pitch+spin —
+      // never a scroll-lock (OrbitControls `touches`).
       style={{ touchAction: "pan-y" }}
     >
       <SceneContents accent={accent} controller={controller} data={data} />

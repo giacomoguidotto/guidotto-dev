@@ -450,9 +450,31 @@
   letter-spacing: 0.04em;
 }
 
-/* ---------- narrow: let the HUD and controls breathe ---------- */
+/* ---------- phone: a portrait showpiece, read in the page scroll (#30) ---------- */
 
 @media (max-width: 40rem) {
+  /* The section stays a SOFT one-viewport: the 100svh floor (above) holds, the
+     gaps and vertical padding tighten so the portrait instrument and its copy sit
+     close to one screen, and on the shortest devices the footline may spill just
+     past the fold rather than crushing the showpiece. */
+  .finale {
+    gap: clamp(1.4rem, 4vw, 2.25rem);
+    padding: clamp(2.5rem, 8vw, 3.75rem) clamp(1.4rem, 5vw, 3rem);
+  }
+
+  /* Portrait frame: the instrument stands TALL — a generous portion of the
+     viewport — instead of the landscape 16/11 box that stranded the object
+     mid-screen with dead space above and below (the "already small on mobile"
+     report). It is width- AND height-capped so it stays portrait across phone
+     sizes and always leaves the eyebrow/line above and the caption below room.
+     The scene re-aims its default camera to this portrait aspect and tunes DPR
+     (attractor-scene.tsx). */
+  .instrument {
+    width: min(100%, 30rem);
+    max-height: min(70svh, 32rem);
+    aspect-ratio: 3 / 4;
+  }
+
   /* the knob track is the only read now the numerals are gone, so keep it (it
      was hidden when a numeral sat beside it). */
   .landing {
