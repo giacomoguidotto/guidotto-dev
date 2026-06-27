@@ -294,23 +294,31 @@
    standalone .sheet / .vessels / .case block is gone: the three vessels are now one
    DOM node each, rigged by the stage, exactly as the desktop peers are their cells. */
 
-/* The morph carousel + showpiece tiles: the JS rig owns transform + opacity per scroll
-   frame, so neutralise the proof card's mobile CAROUSEL RECEDE (the scale .88 / dim-to-
-   0.5 the #27 observer toggles) AND every eased transition ON THE TILE. Two reasons the
-   transition must be off here: the per-frame FLIP must never lag the scroll, and
-   measure() clears each tile's transform to read its true card box — with a live
-   transition that clear would be caught mid-animation and report a wrong home (the
-   desktop `.ready`-drop, earned for free by killing the transition outright). The rig's
-   inline transform/opacity win over `none`/`1` for Orray + Tempo + the showpiece; the
-   static cards (Scry + Ginevra) simply sit full-size and clear (their loud recede is the
-   #27 observer's job in C.4). The second selector outranks `.ready .tile[data-phase=
-   "rest"]` so the at-rest hover ease can't sneak the transition back in.
+/* The morph carousel + showpiece tiles: WHILE THE MORPH RUNS (not `.released`) the JS
+   rig owns transform + opacity per scroll frame, so neutralise the proof card's mobile
+   CAROUSEL RECEDE (the scale .88 / dim-to-0.5 the #27 observer toggles) AND every eased
+   transition ON THE TILE. Two reasons the transition must be off here: the per-frame
+   FLIP must never lag the scroll, and measure() clears each tile's transform to read its
+   true card box — with a live transition that clear would be caught mid-animation and
+   report a wrong home (the desktop `.ready`-drop, earned for free by killing the
+   transition outright). The rig's inline transform/opacity win over `none`/`1` for Orray
+   + Tempo + the showpiece; the static cards (Scry + Ginevra) simply sit full-size and
+   clear. The second selector outranks `.ready .tile[data-phase="rest"]` so the at-rest
+   hover ease can't sneak the transition back in.
+
+   AT THE RELEASE (`.released`, added from JS at p === 1, the seam where the carousel
+   un-sticks into the page's own scroll) this neutralisation is dropped — the `:not`
+   stops matching — so the proof card's OWN mobile recede + 0.45s settle + [data-active]
+   bloom take the four cards back, identical to the standalone grid: the #27 observer's
+   loud card sits full + clear and its neighbours recede, with the rig's inline styles
+   already cleared (releaseToCarousel) so CSS wins. The showpiece keeps its own inline
+   set-aside transform (rig-driven off-screen), so CSS recede can't pull it back in.
 
    max-width / margin-inline (the proof card's mobile sizing) are deliberately KEPT, so
    the rig measures the same card box the resolved carousel uses. */
 @media (max-width: 40rem) {
-  .mobile .tile,
-  .mobile.ready .tile[data-phase="rest"] {
+  .mobile:not(.released) .tile,
+  .mobile.ready:not(.released) .tile[data-phase="rest"] {
     opacity: 1;
     transform: none;
     transition: none;

@@ -237,6 +237,14 @@ const DANCE: Record<string, DanceRole> = {
 //   - SHOW_SPLIT    the morph point where the bow sweeps back through centre (> 0.5, so
 //                   the first bow owns most of the time; raising it lengthens that bow).
 const SHOW_SWAY_VW = 0.6;
+// The PORTRAIT (#27 C.5) sway, smaller than the landscape 0.6. The desktop showpiece
+// starts off to one side (VITRINE anypinn x≈0.24), so 0.6·vw traverses it the full width
+// to the far side. The portrait showpiece starts horizontally CENTRED (MOBILE_SCATTER
+// resolves AnyPINN to x≈0.5), so the SAME "sweep across to the far side" only needs to
+// reach an edge — about half the traverse. At 0.6·vw a centred start flings AnyPINN fully
+// off the narrow viewport at the bow's peak (it vanishes, then returns); 0.34·vw sweeps it
+// to the far side and back while it stays on screen. Eyeball-tunable on a real phone.
+const MOBILE_SHOW_SWAY_VW = 0.34;
 const SHOW_SPLIT = 0.68;
 // Time warp exponent: m**SHOW_WARP maps SHOW_SPLIT -> 0.5, so sin(2π·warp) has its sole
 // interior zero (the centre sweep) at SHOW_SPLIT, with zero slope at m=0 (smooth start).
@@ -447,7 +455,11 @@ const buildShowRig = (
   vw: number,
   landing: DOMRect | null,
   place: VitrinePlacement | undefined = placementFor(el),
-  widthOverride?: number
+  widthOverride?: number,
+  // The first-bow reach of the S-curve set-aside, as a fraction of viewport width.
+  // Defaults to the landscape SHOW_SWAY_VW so the desktop call is byte-for-byte; the
+  // portrait morph (#27 C.5) passes its own narrower MOBILE_SHOW_SWAY_VW.
+  sway: number = SHOW_SWAY_VW
 ): Rig | null => {
   const poster = child(el, "[data-poster]");
   if (!(place && poster)) {
@@ -494,7 +506,7 @@ const buildShowRig = (
     // lives in `danceDelta`).
     danceUx: 0,
     danceUy: 0,
-    danceAmp: SHOW_SWAY_VW * vw,
+    danceAmp: sway * vw,
     danceSpin: 0,
   };
 };
@@ -577,7 +589,9 @@ const buildMobilePeerRig = (
 // Reuse the desktop buildShowRig for the PORTRAIT showpiece: convert its top-left
 // scatter to the CENTRE-fraction placement buildShowRig expects (top-left + half the
 // square box), and pass the vw width explicitly so the rem-clamp sizing is bypassed.
-// The S-curve set-aside / finale aim / scroll-stable target are all reused verbatim.
+// The S-curve set-aside / finale aim / scroll-stable target are all reused verbatim; the
+// only portrait retune (#27 C.5) is a narrower sway (MOBILE_SHOW_SWAY_VW) for the
+// centred portrait start.
 const buildMobileShowRig = (
   showEl: HTMLElement,
   pinRect: DOMRect,
@@ -599,7 +613,10 @@ const buildMobileShowRig = (
       x: place.x + showW / 2 / pinRect.width,
       y: place.y + showW / 2 / pinRect.height,
     },
-    showW
+    showW,
+    // Portrait exit retune (#27 C.5): a narrower sway, since the portrait showpiece
+    // starts horizontally centred (above) rather than off to one side.
+    MOBILE_SHOW_SWAY_VW
   );
 };
 
@@ -762,18 +779,50 @@ interface Chrome {
   readonly vignette: HTMLElement;
 }
 
+// The chrome hand-off tuning. The desktop morph and the portrait morph share the SAME
+// dissolve timing (the smoothsteps below) but want a different exit GESTURE for the two
+// pieces of moving chrome, because a portrait viewport has far more vertical room:
+//   - thesisLift  rem the centred thesis rises as it hands the baton out;
+//   - batonDrop   rem the "DIVE IN ↓" scroll cue physically DROPS as it fades (0 keeps the
+//                 desktop cue a pure fade — its transform is then never touched, so the
+//                 desktop call stays byte-for-byte).
+interface ChromeTuning {
+  readonly batonDrop: number;
+  readonly thesisLift: number;
+}
+
+// Desktop (landscape) keeps its exact shipped numbers: a 2rem thesis lift and a pure-fade
+// baton (no drop). This is the default, so the desktop driveChrome call is unchanged.
+const DESKTOP_CHROME: ChromeTuning = { batonDrop: 0, thesisLift: 2 };
+// Portrait (#27 C.5): a tall viewport, so the thesis lifts a touch further and the
+// down-arrow "DIVE IN ↓" cue drops as it hands off, reading as the baton passed downward
+// into the scroll. Eyeball-tunable on a real phone.
+const MOBILE_CHROME: ChromeTuning = { batonDrop: 1.4, thesisLift: 3 };
+
 // The contact-sheet chrome hands the baton out: the grain and vignette dissolve, the
 // thesis rises + fades, the scroll cue drops. The accent wash is owned by the
 // coordinator at rest (hover) and once resolved (the lit card); only mid-flight does
-// the chrome release it, so a half-formed grid never carries a stale tint.
-const driveChrome = (chrome: Chrome, p: number, phase: Phase) => {
+// the chrome release it, so a half-formed grid never carries a stale tint. `tuning`
+// shapes the two moving-chrome exit gestures (desktop vs portrait); it defaults to the
+// desktop values so the MotionStage call is byte-for-byte.
+const driveChrome = (
+  chrome: Chrome,
+  p: number,
+  phase: Phase,
+  tuning: ChromeTuning = DESKTOP_CHROME
+) => {
   chrome.grain.style.opacity = (0.11 * (1 - smoothstep(0.2, 0.6, p))).toFixed(
     3
   );
   chrome.vignette.style.opacity = (1 - smoothstep(0.25, 0.62, p)).toFixed(3);
   chrome.copy.style.opacity = (1 - smoothstep(0.3, 0.66, p)).toFixed(3);
-  chrome.copy.style.transform = `translate(-50%, calc(-50% - ${(p * 2).toFixed(3)}rem))`;
+  chrome.copy.style.transform = `translate(-50%, calc(-50% - ${(p * tuning.thesisLift).toFixed(3)}rem))`;
   chrome.baton.style.opacity = (1 - Math.min(1, p * 6)).toFixed(3);
+  // The down-arrow cue drops as it fades on portrait; desktop (batonDrop 0) leaves the
+  // baton transform untouched, so its CSS translateX(-50%) centring is byte-for-byte.
+  if (tuning.batonDrop !== 0) {
+    chrome.baton.style.transform = `translate(-50%, ${(p * tuning.batonDrop).toFixed(3)}rem)`;
+  }
   // The grid's section label is the baton's counterpart: it hands IN as the grid
   // resolves (the same late ramp the peer captions use), so it is invisible over
   // the contact sheet and reads as the title of the settled grid. It lives in the
@@ -874,22 +923,31 @@ function PlainStage() {
 // type, the chrome driver — and the same sticky-pin-releases mechanic, so the two
 // share one physics.
 //
-// C.3 (this slice): the 3 rigs + the portrait FLIP. The contact sheet is now the PIN
-// (the C.2 standalone display sheet is folded into it), and the three vessels are
-// rigged:
+// The contact sheet is the PIN; the page-flow carousel is the pulled-up sticky
+// `.gridStick`. Three vessels are rigged, the other two stream in:
 //   - the showpiece (AnyPINN) sets itself aside down toward the finale (the same
-//     buildShowRig set-aside the desktop uses, re-aimed for portrait);
+//     buildShowRig set-aside the desktop uses, re-aimed + sway-retuned for portrait);
 //   - Orray morphs into carousel card #1 and LANDS ON THE VIEWPORT-CENTRED slot at
-//     the pin release, so the #27 proximity snap + observer pick it up with no
-//     flicker;
+//     the pin release, so the #27 proximity snap + observer pick it up with no flicker;
 //   - Tempo morphs into carousel card #2.
-// Orray + Tempo are now ONE DOM node each (their home is the carousel card, pulled
-// back to the contact-sheet scatter at rest — exactly as the desktop peers are their
-// grid cells). Scry (#3) + Ginevra (#4) are NEVER rigged: they are static flow cards
-// in the same carousel <ul>, resolved live from the start; the #27 viewport observer
-// that lights them as they scroll into the centre band is the C.4 slice (the single
-// lit coordinator across the rest -> flight -> morph -> observer seam). C.5 is the
-// chrome hand-off + portrait exit retune.
+// Orray + Tempo are ONE DOM node each (their home is the carousel card, pulled back to
+// the contact-sheet scatter at rest — exactly as the desktop peers are their grid
+// cells). Scry (#3) + Ginevra (#4) are NEVER rigged: static flow cards in the same
+// carousel <ul>.
+//
+// ONE lit coordinator spans every phase (#27 C.4): a coarse tap / fine hover lights a
+// vessel AT REST; the first scroll clears that and the tiles go INERT through the
+// flight; at the RELEASE (p === 1) the morph hands the four cards to the page-flow
+// carousel — it lights the centred card (Orray) and the #27 VIEWPORT observer takes
+// over, lighting Tempo / Scry / Ginevra (and firing the snap haptic) as each reaches
+// the centre band. The hand-off is seamless: the rig releases its inline transform so
+// the proof card's own recede + [data-active] bloom own the cards (`.released`, see
+// stage.module.css), the seam seeds the lit centre so there is no dark frame and the
+// observer's first tick is a no-op (no double-light).
+//
+// The chrome hand-off + the showpiece exit are portrait-retuned (#27 C.5): a taller
+// thesis lift, a dropping "DIVE IN ↓" baton (MOBILE_CHROME), and a narrower set-aside
+// sway for the centred portrait showpiece (MOBILE_SHOW_SWAY_VW).
 function MobileMotionStage() {
   const stageRef = useRef<HTMLDivElement>(null);
   const pinRef = useRef<HTMLDivElement>(null);
@@ -935,6 +993,11 @@ function MobileMotionStage() {
 
     let rigs: Rig[] = [];
     const rigByEl = new Map<HTMLElement, Rig>();
+    // The four carousel cards in document order ([Orray, Tempo, Scry, Ginevra]) — the
+    // #27 viewport observer + the release seam read positions off these, so they are
+    // re-captured each measure() (the same nodes survive a reflow, but the array is
+    // rebuilt for clarity).
+    let carouselTiles: HTMLElement[] = [];
 
     // FLIP measurement (portrait): rig Orray + Tempo from their carousel-card homes to
     // the contact-sheet scatter, rig the showpiece's set-aside, and centre Orray's
@@ -951,6 +1014,7 @@ function MobileMotionStage() {
       const tiles = Array.from(
         carousel.querySelectorAll<HTMLElement>("a[data-key]")
       );
+      carouselTiles = tiles;
 
       // Centre Orray's card on the viewport middle during the pin (the #27 seam), then
       // read each card's PINNED home (the carousel is browser-pinned at top: 0, so its
@@ -991,11 +1055,21 @@ function MobileMotionStage() {
       stage.style.height = `${(carouselHeight + MORPH_END * vh).toFixed(2)}px`;
     };
 
-    // ---- the single-lit coordinator (rest hover/tap + resolved card) ----
+    // ---- the single-lit coordinator (rest hover/tap -> inert flight -> morph lights
+    //      the centre at release -> the #27 viewport observer owns the carousel) ----
     let phase: Phase = "rest";
     let lastProgress = -1;
     let activeEl: HTMLElement | null = null;
     let focusedEl: HTMLElement | null = null;
+    // The key the #27 observer last SETTLED at centre, so the snap haptic fires once
+    // per NEW centre (not on every observer tick), and so the release seam can seed it
+    // (it lights Orray, so the observer's first Orray tick is a no-op, not a re-buzz).
+    let centeredKey: string | null = null;
+    // The snap haptic is pure progressive enhancement and is off under reduced motion
+    // (the mobile morph only ever mounts under no-preference, so this is belt-and-braces).
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
     // Live primary-pointer read: a coarse (touch) pointer taps to light and KEEPS lit;
     // a fine pointer (a narrow desktop window, or a hovering pen) lights on hover. Read
     // from a media query updated in place, so a hybrid device flips without re-running
@@ -1047,17 +1121,134 @@ function MobileMotionStage() {
       redrive(el, true);
     };
 
+    // The carousel card whose poster centre sits nearest the viewport's vertical middle
+    // — the one the page-flow carousel reads as "centred". Used to seed the lit card at
+    // the morph release (Orray lands centred there) so the hand-off to the observer
+    // starts from an already-lit centre, with no dark frame.
+    const centeredCard = (): HTMLElement | null => {
+      const mid = window.innerHeight / 2;
+      let best: HTMLElement | null = null;
+      let bestDist = Number.POSITIVE_INFINITY;
+      for (const el of carouselTiles) {
+        const poster = el.querySelector<HTMLElement>("[data-poster]");
+        const box = (poster ?? el).getBoundingClientRect();
+        const dist = Math.abs(box.top + box.height / 2 - mid);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = el;
+        }
+      }
+      return best;
+    };
+
+    // The release seam: at p === 1 the morph has landed the centred card (Orray) exactly
+    // on the proximity-snap centre. Light it and seed `centeredKey`, so the #27 observer
+    // takes over from an ALREADY-lit centre — no double-light (the observer's first tick
+    // on Orray is a no-op + no re-buzz) and no dark frame.
+    const lightCentered = () => {
+      const el = centeredCard();
+      if (!el) {
+        return;
+      }
+      light(el);
+      centeredKey = el.dataset.key ?? null;
+    };
+
+    // Hand a landed peer (Orray / Tempo) to the page-flow carousel: drop the rig's
+    // per-frame transform / opacity / filter so the proof card's OWN mobile recede +
+    // [data-active] bloom (and its 0.45s settle) govern it again — identical to the
+    // static cards and the standalone grid (see stage.module.css `.released`). Its
+    // data-phase ("live"), href (navigability), and lit flag are preserved.
+    const releaseToCarousel = (rig: Rig) => {
+      const s = rig.el.style;
+      s.transform = "";
+      s.opacity = "";
+      s.transformOrigin = "";
+      rig.poster.style.filter = "";
+      rig.poster.style.borderRadius = "";
+      if (rig.tag) {
+        rig.tag.style.opacity = "";
+      }
+      if (rig.caption) {
+        rig.caption.style.opacity = "";
+      }
+    };
+
+    // The #27 observer's settle: the card that just reached the centre band becomes the
+    // single loud one (through the same coordinator), and a NEW centre fires the snap
+    // haptic (Android buzzes; iOS Safari has no Vibration API and silently no-ops; off
+    // under reduced motion). Only acts once the morph has released to the carousel
+    // (phase "live"); during rest / flight the morph owns lighting and these ticks
+    // (rigged tiles transforming through centre) are ignored.
+    const settle = (el: HTMLElement) => {
+      if (phase !== "live") {
+        return;
+      }
+      light(el);
+      const key = el.dataset.key;
+      if (key && key !== centeredKey) {
+        centeredKey = key;
+        if (!reduce && typeof navigator.vibrate === "function") {
+          navigator.vibrate(8);
+        }
+      }
+    };
+
+    // A rig's interactivity phase WHILE THE MORPH RUNS: the showpiece reads phaseFor (it
+    // never goes live — it sets itself aside); a peer is the rest vessel at the very top
+    // and inert flight through the whole morph. A peer only becomes a navigable, CSS-owned
+    // carousel card at the release (p === 1), which apply() drives directly.
+    const morphPhase = (rig: Rig, p: number): Phase => {
+      if (rig.showpiece) {
+        return phaseFor(p, true);
+      }
+      return p <= HERO_REST ? "rest" : "flight";
+    };
+
+    // The stage phase: rest at the very top, inert flight through the morph, and live
+    // ONLY at the release (p === 1) — not at RESOLVE_AT — so the per-frame FLIP never
+    // wears the carousel transition and the rig -> CSS hand-off happens in one clean step.
+    const stagePhase = (p: number, landed: boolean): Phase => {
+      if (landed) {
+        return "live";
+      }
+      return p <= HERO_REST ? "rest" : "flight";
+    };
+
+    // Drive every rig for the current progress. Landed peers are RELEASED to the page
+    // -flow carousel (CSS owns recede + bloom); everything else (the still-morphing peers
+    // and the always-rig-driven showpiece set-aside) rides the FLIP.
+    const driveRigs = (p: number, landed: boolean) => {
+      for (const rig of rigs) {
+        if (landed && !rig.showpiece) {
+          releaseToCarousel(rig);
+          setPhase(rig, "live");
+        } else {
+          drive(rig, p, phase === "rest" && rig.el === activeEl);
+          setPhase(rig, morphPhase(rig, p));
+        }
+      }
+    };
+
     const apply = (p: number) => {
       stage.style.setProperty("--p", p.toFixed(4));
-      phase = phaseFor(p, false);
-      // Leaving rest drops any hover/tap lighting so a half-formed card is never lit.
-      if (phase !== "rest" && activeEl) {
+      const landed = p >= 1;
+      phase = stagePhase(p, landed);
+      // Leaving rest for the inert flight drops any hover/tap lighting so a half-formed
+      // card is never lit. The release (landed) keeps the centred card lit instead.
+      if (!landed && phase !== "rest" && activeEl) {
         setActive(null);
       }
-      driveChrome(chrome, p, phase);
-      for (const rig of rigs) {
-        drive(rig, p, phase === "rest" && rig.el === activeEl);
-        setPhase(rig, phaseFor(p, rig.showpiece));
+      // Flip the released gate so the proof card's own recede + transition take the
+      // four cards back once the carousel free-scrolls (stage.module.css `.released`).
+      stage.classList.toggle(styles.released, landed);
+      driveChrome(chrome, p, phase, MOBILE_CHROME);
+      driveRigs(p, landed);
+      // At the release, light the centred card so the #27 observer inherits an already
+      // -lit centre (no dark frame). Skipped if a card is already lit (the observer or a
+      // prior released frame owns it), so the seam never double-lights.
+      if (landed && !activeEl) {
+        lightCentered();
       }
     };
 
@@ -1185,6 +1376,27 @@ function MobileMotionStage() {
     const observer = new ResizeObserver(remeasure);
     observer.observe(carousel);
 
+    // The #27 center-focus observer (the SAME mechanic the standalone ProofGrid uses):
+    // viewport-rooted (`root: null`, the cards flow in the page's own scroll), watching a
+    // thin band at the viewport's vertical centre. Once the morph has released (phase
+    // "live"), the card that lands in the band becomes the single loud one and a new
+    // centre fires the snap haptic — so a swipe lights Tempo, then Scry, then Ginevra.
+    // It observes through rest / flight too, but `settle` ignores those ticks (the morph
+    // owns lighting until the release), which is what unifies the two systems into one.
+    const centerObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            settle(entry.target as HTMLElement);
+          }
+        }
+      },
+      { root: null, rootMargin: "-45% 0px -45% 0px", threshold: 0 }
+    );
+    for (const tile of carouselTiles) {
+      centerObserver.observe(tile);
+    }
+
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", remeasure);
@@ -1196,11 +1408,13 @@ function MobileMotionStage() {
       document.removeEventListener("pointerdown", onDocPointerDown);
       coarseMql.removeEventListener("change", onCoarseChange);
       observer.disconnect();
+      centerObserver.disconnect();
       if (raf !== 0) {
         cancelAnimationFrame(raf);
       }
       cancelAnimationFrame(readyRaf);
       stage.classList.remove(styles.ready);
+      stage.classList.remove(styles.released);
       for (const rig of rigs) {
         restoreRig(rig);
       }
@@ -1209,6 +1423,7 @@ function MobileMotionStage() {
       copy.style.opacity = "";
       copy.style.transform = "";
       baton.style.opacity = "";
+      baton.style.transform = "";
       label.style.opacity = "";
       pin.style.removeProperty("--live-accent");
       pin.removeAttribute("data-settling");
