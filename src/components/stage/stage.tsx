@@ -4,10 +4,10 @@
 // grid into one continuous scroll story (Option C: the showpiece is excluded from
 // the grid).
 //
-// Deep module: <Stage /> is the entire interface. Behind it sit two presentations
-// and one physics:
+// Deep module: <Stage /> is the entire interface. Behind it sit three
+// presentations and one physics:
 //
-//   - PLAIN (the default, and what reduced-motion / coarse pointer / narrow / no-JS
+//   - PLAIN (the default, and what reduced-motion / no-JS / a 40-48rem fine pointer
 //     always get): the verified <Hero /> then <ProofGrid /> as two stacked sections.
 //     Server-rendered, indexable, fully legible. This is also the SSR + first-client
 //     render, so there is never a hydration mismatch; the morph is layered on only
@@ -18,6 +18,16 @@
 //     ProjectTile) that is the vitrine vessel at rest and becomes the proof card once
 //     landed — never two elements that cross-fade (see CONTEXT -> "Decision
 //     (2026-06-25): one DOM node per project").
+//
+//   - MOBILE (the portrait twin of MOTION, on motion-welcome viewports <= 40rem, any
+//     pointer): a portrait scroll-handoff FLIP morph that feeds the page-flow
+//     center-focus carousel (issue #27, Part C). It is a SEPARATE component
+//     (<MobileMotionStage />) so the desktop MotionStage stays byte-for-byte
+//     untouched. SCAFFOLD ONLY for now: the activation seam is wired (Stage routes
+//     phones here) but the morph itself is not built yet, so it renders the plain
+//     sectioned story unchanged. The portrait contact sheet, the 3 rigs + FLIP, the
+//     single lit coordinator, and the chrome hand-off grow into it in later slices
+//     (#27 C.2-C.5).
 //
 // THE FIVE VESSELS ARE UNIFORM. Every tile — the four peers AND the AnyPINN
 // showpiece — is one Rig with a SOURCE (its vitrine scatter point + size) and a
@@ -56,15 +66,23 @@ import { content, type Project } from "~/content";
 import { ProjectTile, type TileModel } from "./project-tile";
 import styles from "./stage.module.css";
 
-type Mode = "plain" | "motion";
+type Mode = "plain" | "motion" | "mobile";
 type Phase = "rest" | "flight" | "live";
 
-// The morph is enhancement-only: it needs a fine pointer (to read the contact
-// sheet), motion permission, and enough width for the 2x2 (above the grid's own
-// 40rem carousel switch, so the two layouts never fight). Everything else gets the
-// plain sectioned story.
+// The desktop morph is enhancement-only: it needs a fine pointer (to read the
+// contact sheet), motion permission, and enough width for the 2x2 (above the grid's
+// own 40rem carousel switch, so the two layouts never fight).
 const MOTION_QUERY =
   "(pointer: fine) and (prefers-reduced-motion: no-preference) and (min-width: 48rem)";
+
+// The portrait morph (#27 Part C) takes the narrow band the desktop morph leaves to
+// the carousel: motion-welcome viewports <= 40rem, ANY pointer (a phone, or a narrow
+// fine-pointer window). It matches the grid's own MOBILE_QUERY (proof-grid.tsx) so
+// the portrait morph and the page-flow carousel it feeds switch on at the same width.
+// The 40-48rem gap (a fine pointer too narrow for the 2x2 but wider than a phone)
+// matches NEITHER query and falls back to PLAIN, as does reduced-motion / no-JS.
+const MOBILE_MOTION_QUERY =
+  "(prefers-reduced-motion: no-preference) and (max-width: 40rem)";
 
 // The morph completes over the first MORPH_END of the one-viewport pin; the rest is
 // a hold where the resolved grid reads as a normal grid before the page continues.
@@ -629,20 +647,42 @@ const restoreRig = (rig: Rig) => {
 };
 
 export function Stage() {
-  // Default to plain so SSR and the first client render agree; the effect upgrades to
-  // motion only where it is welcome.
+  // Default to plain so SSR and the first client render agree (no hydration
+  // mismatch); the effect upgrades to a morph only where it is welcome.
   const [mode, setMode] = useState<Mode>("plain");
 
   useEffect(() => {
-    const mql = window.matchMedia(MOTION_QUERY);
-    const sync = () => setMode("motion");
+    const desktop = window.matchMedia(MOTION_QUERY);
+    const mobile = window.matchMedia(MOBILE_MOTION_QUERY);
+    // The desktop morph wins where both could nominally apply (its 48rem floor and
+    // the mobile 40rem ceiling never overlap, but evaluating it first keeps the
+    // precedence explicit). Anything matching neither — reduced-motion, no-JS, or a
+    // 40-48rem fine pointer — stays plain. Re-evaluated on resize / orientation /
+    // pointer / reduced-motion change, so a window that crosses a boundary swaps
+    // cleanly instead of latching on the first match.
+    const sync = () => {
+      if (desktop.matches) {
+        setMode("motion");
+      } else if (mobile.matches) {
+        setMode("mobile");
+      } else {
+        setMode("plain");
+      }
+    };
     sync();
-    mql.addEventListener("change", sync);
-    return () => mql.removeEventListener("change", sync);
+    desktop.addEventListener("change", sync);
+    mobile.addEventListener("change", sync);
+    return () => {
+      desktop.removeEventListener("change", sync);
+      mobile.removeEventListener("change", sync);
+    };
   }, []);
 
   if (mode === "motion") {
     return <MotionStage />;
+  }
+  if (mode === "mobile") {
+    return <MobileMotionStage />;
   }
   return <PlainStage />;
 }
@@ -659,6 +699,29 @@ function PlainStage() {
       </ShowcaseRoot>
     </>
   );
+}
+
+// MobileMotionStage — the portrait twin of MotionStage (#27 Part C), the
+// scroll-handoff FLIP morph that feeds the page-flow center-focus carousel on
+// phones. It is its own component, so the desktop MotionStage stays byte-for-byte
+// untouched (the explicit ownership contract of #27 Part C).
+//
+// SCAFFOLD (#27 C.1): the activation seam is wired — Stage routes motion-welcome
+// <= 40rem viewports here — but the morph is not built yet, so this renders the
+// plain sectioned story (the same <Hero /> + page-flow carousel a phone already
+// gets via PlainStage). The mobile experience is therefore UNCHANGED by this slice;
+// it only establishes the seam the later slices grow the morph into:
+//   - C.2: a portrait contact sheet (showpiece + Orray + Tempo) with the hero's
+//          tap-at-rest (coarse) / hover (narrow fine) lighting model;
+//   - C.3: 3 rigs + the portrait FLIP — the showpiece sets itself aside to the
+//          finale, Orray + Tempo morph into carousel cards #1 / #2 (Scry + Ginevra
+//          stay static flow cards), landing Orray on the viewport-centered slot;
+//   - C.4: a single lit coordinator across rest -> flight -> morph -> the #27
+//          viewport observer, with no double-light / dark frame at the seam;
+//   - C.5: the chrome hand-off (thesis fade/rise, "DIVE IN" baton, showpiece
+//          portrait exit retune).
+function MobileMotionStage() {
+  return <PlainStage />;
 }
 
 function MotionStage() {
