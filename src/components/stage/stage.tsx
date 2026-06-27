@@ -23,11 +23,13 @@
 //     pointer): a portrait scroll-handoff FLIP morph that feeds the page-flow
 //     center-focus carousel (issue #27, Part C). It is a SEPARATE component
 //     (<MobileMotionStage />) so the desktop MotionStage stays byte-for-byte
-//     untouched. SCAFFOLD ONLY for now: the activation seam is wired (Stage routes
-//     phones here) but the morph itself is not built yet, so it renders the plain
-//     sectioned story unchanged. The portrait contact sheet, the 3 rigs + FLIP, the
-//     single lit coordinator, and the chrome hand-off grow into it in later slices
-//     (#27 C.2-C.5).
+//     untouched. Built incrementally: the portrait CONTACT SHEET at rest (showpiece
+//     + Orray + Tempo in the tile path, with the hero's tap/hover lighting) is live
+//     now (#27 C.2); it sits above the page-flow carousel and does NOT yet morph. The
+//     rigs + portrait FLIP, the single lit coordinator across the seam, and the chrome
+//     hand-off grow into it in the later slices (#27 C.3-C.5), at which point the
+//     contact-sheet tiles become the carousel cards (one DOM node) the way the desktop
+//     peers are their grid cells.
 //
 // THE FIVE VESSELS ARE UNIFORM. Every tile — the four peers AND the AnyPINN
 // showpiece — is one Rig with a SOURCE (its vitrine scatter point + size) and a
@@ -57,7 +59,13 @@
 // The morph is transform / opacity / filter only (GPU-composited, zero reflow),
 // driven imperatively so there is no per-frame React work.
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Hero } from "~/components/hero";
 import { ProofGrid } from "~/components/proof-grid/proof-grid";
 import proofStyles from "~/components/proof-grid/proof-grid.module.css";
@@ -706,13 +714,14 @@ function PlainStage() {
 // phones. It is its own component, so the desktop MotionStage stays byte-for-byte
 // untouched (the explicit ownership contract of #27 Part C).
 //
-// SCAFFOLD (#27 C.1): the activation seam is wired — Stage routes motion-welcome
-// <= 40rem viewports here — but the morph is not built yet, so this renders the
-// plain sectioned story (the same <Hero /> + page-flow carousel a phone already
-// gets via PlainStage). The mobile experience is therefore UNCHANGED by this slice;
-// it only establishes the seam the later slices grow the morph into:
-//   - C.2: a portrait contact sheet (showpiece + Orray + Tempo) with the hero's
-//          tap-at-rest (coarse) / hover (narrow fine) lighting model;
+// C.2 (this slice): the portrait CONTACT SHEET at rest. <MobileContactSheet />
+// presents the showpiece + Orray + Tempo as a hero-style display case in the TILE
+// path (the same ProjectTile that becomes a card), with the hero's tap-at-rest
+// (coarse) / hover (narrow fine) lighting model ported in (today's desktop rest is
+// hover-only). It sits ABOVE the page-flow carousel (Part B) and does NOT morph
+// yet: there is no pin, no scroll progress, no rig. The later slices grow the morph
+// in, at which point the contact-sheet tiles BECOME the first carousel cards (one
+// DOM node, like the desktop peers are their grid cells):
 //   - C.3: 3 rigs + the portrait FLIP — the showpiece sets itself aside to the
 //          finale, Orray + Tempo morph into carousel cards #1 / #2 (Scry + Ginevra
 //          stay static flow cards), landing Orray on the viewport-centered slot;
@@ -721,7 +730,217 @@ function PlainStage() {
 //   - C.5: the chrome hand-off (thesis fade/rise, "DIVE IN" baton, showpiece
 //          portrait exit retune).
 function MobileMotionStage() {
-  return <PlainStage />;
+  return (
+    <>
+      <MobileContactSheet />
+      <ShowcaseRoot className={proofStyles.stage}>
+        <div className={proofStyles.tint} />
+        <ProofGrid />
+      </ShowcaseRoot>
+    </>
+  );
+}
+
+// ---- the portrait contact sheet (#27 C.2) ----
+
+/** Top-left-anchored portrait placement (a fraction of the sheet for x/y, a vw
+ *  width), the same authoring frame the hero's portrait re-author uses. */
+interface SheetPlacement {
+  readonly w: string;
+  readonly x: string;
+  readonly y: string;
+}
+
+interface SheetVessel {
+  readonly depth: 1 | 2 | 3;
+  readonly model: TileModel;
+  readonly placement: SheetPlacement;
+}
+
+// The portrait scatter: the showpiece reads up top, Orray and Tempo flank the
+// thesis below (Orray near/sharp at depth 1 — it is the vessel that lands as the
+// first carousel card in C.3; Tempo recedes at depth 3). Scry and Ginevra are NOT
+// here — they live only as static cards in the carousel below. The depths reuse the
+// desktop VITRINE values so the contact sheet reads identically to the desktop hero.
+const SHEET_SPECS: {
+  depth: 1 | 2 | 3;
+  key: string;
+  placement: SheetPlacement;
+}[] = [
+  {
+    key: content.showpiece.key,
+    depth: 2,
+    placement: { x: "27%", y: "5%", w: "46vw" },
+  },
+  { key: "orray", depth: 1, placement: { x: "5%", y: "64%", w: "45vw" } },
+  { key: "tempo", depth: 3, placement: { x: "53%", y: "70%", w: "42vw" } },
+];
+
+// Resolve a spec's tile model by key (the showpiece, or a peer). Returns undefined
+// for an unknown key so a renamed/removed subject drops just its vessel instead of
+// throwing — the same partial-set resilience the hero contact sheet has.
+const sheetModelFor = (key: string): TileModel | undefined =>
+  key === content.showpiece.key
+    ? SHOWPIECE_MODEL
+    : PEER_MODELS.find((model) => model.key === key);
+
+const SHEET_VESSELS: SheetVessel[] = SHEET_SPECS.flatMap((spec) => {
+  const model = sheetModelFor(spec.key);
+  return model ? [{ depth: spec.depth, model, placement: spec.placement }] : [];
+});
+
+const sheetAccentFor = (key: string | null): string | undefined =>
+  key
+    ? SHEET_VESSELS.find((v) => v.model.key === key)?.model.accent
+    : undefined;
+
+// The portrait contact sheet at rest: the hero, re-authored as a tall first screen
+// in the tile path. It owns one lit vessel at a time and is the only writer of its
+// own `--live-accent` (mirroring the desktop pin), so hover and tap share one source
+// of truth and exactly one accent is ever live. There is no scroll choreography here
+// — the tiles sit at their portrait scatter via CSS and only light; the morph is C.3.
+function MobileContactSheet() {
+  const sheetRef = useRef<HTMLElement>(null);
+  const vesselsRef = useRef<HTMLDivElement>(null);
+  // Track the primary pointer live, so a hybrid (narrow window + trackpad, then a
+  // touch) flips between hover and tap, exactly like the hero's VitrineStage.
+  const [coarse, setCoarse] = useState(false);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(pointer: coarse)");
+    const sync = () => setCoarse(mql.matches);
+    sync();
+    mql.addEventListener("change", sync);
+    return () => mql.removeEventListener("change", sync);
+  }, []);
+
+  // The single accent write: derive `--live-accent` on the sheet from the lit key so
+  // the tint wash rides exactly one accent. Set on the element (not React state) so a
+  // light/dim never re-renders the whole sheet; cleared on change / unmount.
+  useEffect(() => {
+    const sheet = sheetRef.current;
+    if (!sheet) {
+      return;
+    }
+    const accent = sheetAccentFor(activeKey);
+    if (!accent) {
+      sheet.style.removeProperty("--live-accent");
+      return;
+    }
+    sheet.style.setProperty("--live-accent", accent);
+    return () => {
+      sheet.style.removeProperty("--live-accent");
+    };
+  }, [activeKey]);
+
+  // The lit coordinator, delegated on the vessels layer (so ProjectTile stays a dumb
+  // display node and there is no click handler on a non-interactive element):
+  //   - fine pointer: hover lights the vessel under the pointer, moving onto empty
+  //     field (or leaving the layer) releases it — the hero's hover read;
+  //   - coarse pointer: a tap lights a vessel and the coordinator KEEPS it lit
+  //     (re-tapping never toggles it off); a tap outside the vessels dismisses.
+  // Hover is never bound on coarse, which is what keeps a touch-scroll from
+  // flashing a vessel lit (the same law the carousel below enforces).
+  useEffect(() => {
+    const vessels = vesselsRef.current;
+    if (!vessels) {
+      return;
+    }
+    const tileFrom = (target: EventTarget | null): HTMLElement | null =>
+      target instanceof Element
+        ? target.closest<HTMLElement>("a[data-key]")
+        : null;
+
+    if (coarse) {
+      const onClick = (event: MouseEvent) => {
+        const key = tileFrom(event.target)?.dataset.key;
+        if (key) {
+          setActiveKey(key);
+        }
+      };
+      vessels.addEventListener("click", onClick);
+      return () => vessels.removeEventListener("click", onClick);
+    }
+
+    const onOver = (event: PointerEvent) => {
+      setActiveKey(tileFrom(event.target)?.dataset.key ?? null);
+    };
+    const onLeave = () => setActiveKey(null);
+    vessels.addEventListener("pointerover", onOver);
+    vessels.addEventListener("pointerleave", onLeave);
+    return () => {
+      vessels.removeEventListener("pointerover", onOver);
+      vessels.removeEventListener("pointerleave", onLeave);
+    };
+  }, [coarse]);
+
+  // Touch dismissal: with no hover there is no "leave", so a tap that lands outside
+  // every contact-sheet vessel releases the lit one (a tap on a vessel is handled by
+  // the click above and never dismisses). Scoped to the sheet's own vessels, so
+  // tapping a carousel card below still clears the rest accent and then navigates.
+  useEffect(() => {
+    if (!(coarse && activeKey)) {
+      return;
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      const onVessel =
+        target instanceof Element &&
+        Boolean(target.closest("a[data-key]")) &&
+        Boolean(vesselsRef.current?.contains(target));
+      if (!onVessel) {
+        setActiveKey(null);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [coarse, activeKey]);
+
+  return (
+    <section className={styles.sheet} ref={sheetRef}>
+      <div className={styles.tint} />
+      <div className={styles.grain} />
+
+      <div className={styles.vessels} ref={vesselsRef}>
+        {SHEET_VESSELS.map(({ depth, model, placement }) => (
+          <span
+            className={styles.case}
+            data-active={model.key === activeKey ? "true" : undefined}
+            data-depth={depth}
+            key={model.key}
+            style={
+              {
+                "--mob-x": placement.x,
+                "--mob-y": placement.y,
+                "--mob-w": placement.w,
+              } as CSSProperties
+            }
+          >
+            <ProjectTile active={model.key === activeKey} model={model} />
+          </span>
+        ))}
+      </div>
+
+      <div className={styles.vignette} />
+
+      <div className={`vitrine__copy ${styles.copy}`}>
+        <p className="eyebrow">{content.hero.eyebrow}</p>
+        <h1 aria-label={content.hero.thesis} className="thesis">
+          {content.hero.thesisLines.map((line) => (
+            <span className="thesis__line" key={line}>
+              {line}
+            </span>
+          ))}
+        </h1>
+        <p className="subline">{content.hero.subline}</p>
+      </div>
+
+      <p className={`scroll-baton ${styles.baton}`}>
+        {content.hero.scrollBaton}
+      </p>
+    </section>
+  );
 }
 
 function MotionStage() {
