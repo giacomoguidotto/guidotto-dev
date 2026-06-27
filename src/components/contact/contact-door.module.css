@@ -309,7 +309,7 @@
   }
 
   .morph[open] {
-    --reveal-base: 520ms;
+    --reveal-base: 320ms;
   }
 
   @keyframes revealField {
