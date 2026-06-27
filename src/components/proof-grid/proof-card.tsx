@@ -13,26 +13,30 @@
 // visible, so two cards can never answer loudly at once.
 //
 // Input paths, all funnelled through the coordinator:
-//   - desktop mouse (fine pointer, grid): pointer-enter activates, pointer-leave
-//     releases, first click navigates;
+//   - desktop mouse / hovering stylus (fine pointer, OR a pen at pressure 0 —
+//     Apple Pencil / S Pen — even on a coarse-primary device): pointer-enter
+//     activates, pointer-leave releases, first click navigates;
 //   - keyboard (either layout): focus-visible activates (and, in the carousel,
 //     centres the card), blur releases on desktop, Enter navigates;
 //   - mobile carousel (coarse / <= 40rem): the centred card is set by the
 //     coordinator's scroll observer; a tap on a NON-centred card brings it to
 //     centre + focuses it instead of leaving, a tap on the already-centred card
-//     follows the link. Hover never activates here, so scrolling can't light a
-//     card.
-//   - non-carousel coarse (e.g. a tablet on the grid): first tap reveals, second
-//     tap on the active card navigates.
+//     follows the link. Hover never activates here (mouse and pen alike), so
+//     scrolling can't light a card.
+//   - non-carousel coarse (e.g. a tablet on the grid): a hovering pen lights the
+//     card like a mouse; a finger's first tap reveals, second tap on the active
+//     card navigates.
 
 import {
   type CSSProperties,
   type FocusEvent,
   type MouseEvent,
+  type PointerEvent,
   useCallback,
   useEffect,
   useRef,
 } from "react";
+import { isPenHover } from "~/components/showcase/pen-hover";
 import { ProjectMedia } from "~/components/showcase/project-media";
 import { useAccent } from "~/components/showcase/showcase-root";
 import type { Project } from "~/content";
@@ -115,20 +119,35 @@ export function ProofCard({
     onBlur(project.key);
   }, [onBlur, project.key]);
 
-  const handlePointerEnter = useCallback(() => {
-    // Hover is a desktop-grid, fine-pointer affordance only. In the carousel the
-    // scroll observer owns the active card, and on touch the tap gate rules, so
-    // hover never activates there (this is the scroll-triggers-hover fix).
-    if (!(carousel || coarseRef.current)) {
-      onActivate(project.key);
-    }
-  }, [carousel, onActivate, project.key]);
+  const handlePointerEnter = useCallback(
+    (event: PointerEvent<HTMLAnchorElement>) => {
+      // Hover is a desktop-grid affordance. A hovering stylus (pen, pressure 0 —
+      // Apple Pencil / S Pen) counts as a mouse hover, so it lights the card on a
+      // coarse-primary device too; finger touch never does (the tap gate rules,
+      // which is the scroll-triggers-hover fix). The carousel never hovers — the
+      // scroll observer owns the active card — and a mouse is blocked there too,
+      // so a pen matches the mouse and stays out as well.
+      if (carousel) {
+        return;
+      }
+      if (!coarseRef.current || isPenHover(event)) {
+        onActivate(project.key);
+      }
+    },
+    [carousel, onActivate, project.key]
+  );
 
-  const handlePointerLeave = useCallback(() => {
-    if (!(carousel || coarseRef.current)) {
-      onPointerLeave(project.key);
-    }
-  }, [carousel, onPointerLeave, project.key]);
+  const handlePointerLeave = useCallback(
+    (event: PointerEvent<HTMLAnchorElement>) => {
+      if (carousel) {
+        return;
+      }
+      if (!coarseRef.current || isPenHover(event)) {
+        onPointerLeave(project.key);
+      }
+    },
+    [carousel, onPointerLeave, project.key]
+  );
 
   const handleClick = useCallback(
     (event: MouseEvent<HTMLAnchorElement>) => {

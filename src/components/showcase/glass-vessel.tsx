@@ -14,14 +14,22 @@
 //   - "hover" (fine pointer): hover / keyboard focus reports activation, leave /
 //     blur reports release; the lit look is CSS-driven (:hover / :focus-visible)
 //     and transient.
-//   - "tap" (coarse pointer): hover does not exist, so a tap reports activation
-//     and the coordinator keeps `active` set (a tap outside dismisses). The FIRST
-//     tap just selects (its bloom + sweep are the CSS activation). Re-tapping the
-//     already-lit vessel replays a soft, springy press + gloss so it still feels
-//     alive without ever toggling off.
+//   - "tap" (coarse pointer): finger touch has no hover, so a tap reports
+//     activation and the coordinator keeps `active` set (a tap outside dismisses).
+//     The FIRST tap just selects (its bloom + sweep are the CSS activation).
+//     Re-tapping the already-lit vessel replays a soft, springy press + gloss so it
+//     still feels alive without ever toggling off. A hovering stylus is the one
+//     exception: a pen (Apple Pencil / S Pen) hovering above the glass is treated
+//     exactly like a mouse hover (see pen-hover.ts), lighting the vessel on enter
+//     and clearing it on leave — finger touch still taps.
 
-import { type CSSProperties, useRef } from "react";
+import {
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  useRef,
+} from "react";
 import type { Motif } from "~/content";
+import { isPenHover } from "./pen-hover";
 import { ProjectMedia } from "./project-media";
 
 /** Orbs flatter ambient art; rects keep rectangular app UIs legible. */
@@ -99,6 +107,21 @@ export function GlassVessel({
   const activate = () => onActivate?.(subject.key);
   const deactivate = () => onDeactivate?.();
 
+  // A hovering stylus reads as a mouse hover in BOTH modes: a fine pointer always
+  // lights (mouse / trackpad, as before), and in tap mode only a pen hover passes
+  // the gate — finger touch never does, so it stays a tap and the coarse
+  // sticky-hover glitch the gating kills stays killed.
+  const handlePointerEnter = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!tap || isPenHover(event)) {
+      activate();
+    }
+  };
+  const handlePointerLeave = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!tap || isPenHover(event)) {
+      deactivate();
+    }
+  };
+
   // A tap always (re)activates; the coordinator never toggles off. The spring is
   // a re-tap reward only: the first tap just selects (the CSS activation handles
   // its bloom + sweep), so we only play the press + replay the gloss when this
@@ -132,8 +155,8 @@ export function GlassVessel({
       onBlur={tap ? undefined : deactivate}
       onClick={tap ? handleTap : undefined}
       onFocus={tap ? undefined : activate}
-      onPointerEnter={tap ? undefined : activate}
-      onPointerLeave={tap ? undefined : deactivate}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
       style={vesselStyle}
       type="button"
     >
