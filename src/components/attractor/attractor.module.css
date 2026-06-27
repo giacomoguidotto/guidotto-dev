@@ -324,7 +324,9 @@
 .scrubberFill {
   position: absolute;
   inset: 0 auto 0 0;
-  width: 0;
+  /* the fill rides a single `--progress` (0 -> 1) the rAF writes on the root; the
+     touch thumb below reads the same value, so one write moves both. */
+  width: calc(var(--progress, 0) * 100%);
   background: linear-gradient(
     90deg,
     color-mix(in oklch, var(--accent) 40%, transparent),
@@ -348,6 +350,53 @@
 .scrubber:focus-within .scrubberTrack {
   outline: 2px solid color-mix(in oklch, var(--accent) 60%, transparent);
   outline-offset: 3px;
+}
+
+/* a visible draggable thumb parked on the fill edge — TOUCH ONLY. Desktop keeps
+   the bare 2px bar (the cursor is its whole affordance), so the thumb is hidden
+   by default and only the coarse-pointer block below reveals it. It rides the
+   same `--progress` the fill does, so it sits exactly on the fill's leading edge,
+   and is purely decorative (pointer-events: none) — the native range underneath
+   still takes every drag and tap. It lives on the .scrubber (not inside the
+   overflow-hidden track) so it can stand proud of the slim 2px bar. */
+.scrubberThumb {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--progress, 0) * 100%);
+  z-index: 1;
+  display: none;
+  width: 0.85rem;
+  height: 0.85rem;
+  pointer-events: none;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow:
+    0 0 10px color-mix(in oklch, var(--accent) 65%, transparent),
+    0 1px 3px oklch(0 0 0 / 0.55);
+  translate: -50% -50%;
+}
+
+/* ---------- touch: a real control (visible thumb + a fat tap band) ---------- */
+
+/* Coarse pointers (no hover, no precise cursor) get the scrubber as an ACTUAL
+   control: the thumb above turns on, and the invisible native range grows to a
+   ~44px tap band (the iOS minimum) centred on the slim 2px bar — so a tap
+   ANYWHERE in that band seeks (native range behaviour), not just a hairline drag.
+   The visible bar stays slim; the band overflows the slim row without moving
+   layout. `touch-action: pan-y` keeps a vertical swipe scrolling the page (never
+   a scroll-lock) while a horizontal drag scrubs. Desktop (fine pointer) never
+   enters this block, so its bare invisible-range-over-a-2px-bar is untouched. */
+@media (pointer: coarse) {
+  .scrubberThumb {
+    display: block;
+  }
+
+  .scrubberInput {
+    inset: 50% 0 auto 0;
+    height: 44px;
+    touch-action: pan-y;
+    transform: translateY(-50%);
+  }
 }
 
 /* ---------- the landed fifth vessel (AnyPINN, small, top-left) ---------- */

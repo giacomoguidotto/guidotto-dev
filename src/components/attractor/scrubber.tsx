@@ -9,9 +9,12 @@
 // cancels the autoplay for good (the auto-play is a single on-view beat), but
 // never locks scrolling.
 //
-// An rAF loop reflects the controller's progress into the fill width and the
-// native input's value when the visitor is not actively dragging; while dragging,
-// the input drives the controller. The same loop fades the bar in off the scene's
+// An rAF loop reflects the controller's progress into a `--progress` custom
+// property (CSS draws the fill width off it, and on touch the visible thumb rides
+// the same value) and into the native input's value when the visitor is not
+// actively dragging; while dragging, the input drives the controller. On coarse
+// pointers CSS alone widens the input to a ~44px tap band and reveals the thumb —
+// the desktop bar is left bare. The same loop fades the bar in off the scene's
 // `controlReveal` (the progress bar LEADS the console's staged entrance) and gates
 // its pointer input shut until it is mostly present, so an invisible bar never
 // swallows a drag meant to orbit. No per-frame React state.
@@ -29,14 +32,15 @@ const SCRUBBER_LABEL = "Scrub the training epoch";
 // an invisible-but-grabbable strip over the scene).
 const CONTROL_INTERACTIVE = 0.6;
 
-/** Reflect the controller's progress into the fill width + the idle input value. */
+/** Reflect the controller's progress into the `--progress` custom property (CSS
+ *  draws the fill + the touch thumb off it) and the idle input value. */
 function paintProgress(
-  fillEl: HTMLSpanElement | null,
+  rootEl: HTMLDivElement | null,
   inputEl: HTMLInputElement | null,
   controller: FinaleController
 ): void {
-  if (fillEl) {
-    fillEl.style.width = `${controller.progress * 100}%`;
+  if (rootEl) {
+    rootEl.style.setProperty("--progress", String(controller.progress));
   }
   if (inputEl && !controller.userScrubbing) {
     inputEl.value = String(controller.progress);
@@ -60,7 +64,6 @@ interface ScrubberProps {
 export function Scrubber({ controller }: ScrubberProps) {
   const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
-  const fill = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     let raf = 0;
@@ -70,7 +73,7 @@ export function Scrubber({ controller }: ScrubberProps) {
       // Idle steady-state writes nothing: skip the DOM until a value moves.
       if (controller.progress !== last) {
         last = controller.progress;
-        paintProgress(fill.current, input.current, controller);
+        paintProgress(root.current, input.current, controller);
       }
       if (controller.controlReveal !== lastReveal) {
         lastReveal = controller.controlReveal;
@@ -94,8 +97,11 @@ export function Scrubber({ controller }: ScrubberProps) {
   return (
     <div className={styles.scrubber} ref={root}>
       <span className={styles.scrubberTrack}>
-        <span className={styles.scrubberFill} ref={fill} />
+        <span className={styles.scrubberFill} />
       </span>
+      {/* the touch-only thumb: parked on the fill edge by CSS off `--progress`,
+          hidden on desktop. Decorative — the native range below carries input. */}
+      <span className={styles.scrubberThumb} />
       <input
         aria-label={SCRUBBER_LABEL}
         className={styles.scrubberInput}
