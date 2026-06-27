@@ -69,7 +69,19 @@ function TileCaption({ model }: { model: TileModel }) {
   );
 }
 
-export function ProjectTile({ model }: { model: TileModel }) {
+export function ProjectTile({
+  model,
+  active,
+}: {
+  model: TileModel;
+  /**
+   * Declarative lit state for the React-driven contact sheets (the mobile portrait
+   * morph, #27 Part C). The desktop MotionStage leaves this undefined and writes
+   * `data-active` imperatively per scroll frame, so an undefined `active` renders no
+   * attribute and never fights that imperative write.
+   */
+  active?: boolean;
+}) {
   return (
     // No href here on purpose: the stage adds it (and turns navigation on) only
     // once the card has resolved. At rest this is a hover-reactive but
@@ -78,6 +90,7 @@ export function ProjectTile({ model }: { model: TileModel }) {
     // biome-ignore lint/a11y/useValidAnchor: href + interactivity are added by the stage at the resolve threshold (dynamic, single-node handoff).
     <a
       className={`${proofStyles.card} ${styles.tile}`}
+      data-active={active ? "true" : undefined}
       data-href={model.repoUrl}
       data-key={model.key}
       rel="noreferrer"
