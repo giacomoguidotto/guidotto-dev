@@ -4,10 +4,10 @@
 // grid into one continuous scroll story (Option C: the showpiece is excluded from
 // the grid).
 //
-// Deep module: <Stage /> is the entire interface. Behind it sit two presentations
-// and one physics:
+// Deep module: <Stage /> is the entire interface. Behind it sit three
+// presentations and one physics:
 //
-//   - PLAIN (the default, and what reduced-motion / coarse pointer / narrow / no-JS
+//   - PLAIN (the default, and what reduced-motion / no-JS / a 40-48rem fine pointer
 //     always get): the verified <Hero /> then <ProofGrid /> as two stacked sections.
 //     Server-rendered, indexable, fully legible. This is also the SSR + first-client
 //     render, so there is never a hydration mismatch; the morph is layered on only
@@ -18,6 +18,18 @@
 //     ProjectTile) that is the vitrine vessel at rest and becomes the proof card once
 //     landed — never two elements that cross-fade (see CONTEXT -> "Decision
 //     (2026-06-25): one DOM node per project").
+//
+//   - MOBILE (the portrait twin of MOTION, on motion-welcome viewports <= 40rem, any
+//     pointer): a portrait scroll-handoff FLIP morph that feeds the page-flow
+//     center-focus carousel (issue #27, Part C). It is a SEPARATE component
+//     (<MobileMotionStage />) so the desktop MotionStage stays byte-for-byte
+//     untouched. Built incrementally: the portrait CONTACT SHEET at rest (showpiece
+//     + Orray + Tempo in the tile path, with the hero's tap/hover lighting) is live
+//     now (#27 C.2); it sits above the page-flow carousel and does NOT yet morph. The
+//     rigs + portrait FLIP, the single lit coordinator across the seam, and the chrome
+//     hand-off grow into it in the later slices (#27 C.3-C.5), at which point the
+//     contact-sheet tiles become the carousel cards (one DOM node) the way the desktop
+//     peers are their grid cells.
 //
 // THE FIVE VESSELS ARE UNIFORM. Every tile — the four peers AND the AnyPINN
 // showpiece — is one Rig with a SOURCE (its vitrine scatter point + size) and a
@@ -56,15 +68,23 @@ import { content, type Project } from "~/content";
 import { ProjectTile, type TileModel } from "./project-tile";
 import styles from "./stage.module.css";
 
-type Mode = "plain" | "motion";
+type Mode = "plain" | "motion" | "mobile";
 type Phase = "rest" | "flight" | "live";
 
-// The morph is enhancement-only: it needs a fine pointer (to read the contact
-// sheet), motion permission, and enough width for the 2x2 (above the grid's own
-// 40rem carousel switch, so the two layouts never fight). Everything else gets the
-// plain sectioned story.
+// The desktop morph is enhancement-only: it needs a fine pointer (to read the
+// contact sheet), motion permission, and enough width for the 2x2 (above the grid's
+// own 40rem carousel switch, so the two layouts never fight).
 const MOTION_QUERY =
   "(pointer: fine) and (prefers-reduced-motion: no-preference) and (min-width: 48rem)";
+
+// The portrait morph (#27 Part C) takes the narrow band the desktop morph leaves to
+// the carousel: motion-welcome viewports <= 40rem, ANY pointer (a phone, or a narrow
+// fine-pointer window). It matches the grid's own MOBILE_QUERY (proof-grid.tsx) so
+// the portrait morph and the page-flow carousel it feeds switch on at the same width.
+// The 40-48rem gap (a fine pointer too narrow for the 2x2 but wider than a phone)
+// matches NEITHER query and falls back to PLAIN, as does reduced-motion / no-JS.
+const MOBILE_MOTION_QUERY =
+  "(prefers-reduced-motion: no-preference) and (max-width: 40rem)";
 
 // The morph completes over the first MORPH_END of the one-viewport pin; the rest is
 // a hold where the resolved grid reads as a normal grid before the page continues.
@@ -217,6 +237,14 @@ const DANCE: Record<string, DanceRole> = {
 //   - SHOW_SPLIT    the morph point where the bow sweeps back through centre (> 0.5, so
 //                   the first bow owns most of the time; raising it lengthens that bow).
 const SHOW_SWAY_VW = 0.6;
+// The PORTRAIT (#27 C.5) sway, smaller than the landscape 0.6. The desktop showpiece
+// starts off to one side (VITRINE anypinn x≈0.24), so 0.6·vw traverses it the full width
+// to the far side. The portrait showpiece starts horizontally CENTRED (MOBILE_SCATTER
+// resolves AnyPINN to x≈0.5), so the SAME "sweep across to the far side" only needs to
+// reach an edge — about half the traverse. At 0.6·vw a centred start flings AnyPINN fully
+// off the narrow viewport at the bow's peak (it vanishes, then returns); 0.34·vw sweeps it
+// to the far side and back while it stays on screen. Eyeball-tunable on a real phone.
+const MOBILE_SHOW_SWAY_VW = 0.34;
 const SHOW_SPLIT = 0.68;
 // Time warp exponent: m**SHOW_WARP maps SHOW_SPLIT -> 0.5, so sin(2π·warp) has its sole
 // interior zero (the centre sweep) at SHOW_SPLIT, with zero slope at m=0 (smooth start).
@@ -415,19 +443,29 @@ const buildPeerRig = (
 // small at the top-left of the attractor). With no finale present it simply slides
 // straight down at natural size — the standalone set-aside (the finale must not depend
 // on the loop). `landing` is the finale slot's viewport rect, or null when absent.
+// `place` + `widthOverride` default to the DESKTOP read (placementFor / vitrineWidth)
+// so the desktop MotionStage call is byte-for-byte unchanged. The portrait morph
+// (#27 C.3) reuses this whole helper — the S-curve set-aside aimed at the finale, the
+// scroll-stable target math — by passing its own CENTRE-fraction placement and an
+// explicit width (the portrait vessel is sized in vw, not the desktop rem clamp).
 const buildShowRig = (
   el: HTMLElement,
   pinRect: DOMRect,
   rem: number,
   vw: number,
-  landing: DOMRect | null
+  landing: DOMRect | null,
+  place: VitrinePlacement | undefined = placementFor(el),
+  widthOverride?: number,
+  // The first-bow reach of the S-curve set-aside, as a fraction of viewport width.
+  // Defaults to the landscape SHOW_SWAY_VW so the desktop call is byte-for-byte; the
+  // portrait morph (#27 C.5) passes its own narrower MOBILE_SHOW_SWAY_VW.
+  sway: number = SHOW_SWAY_VW
 ): Rig | null => {
-  const place = placementFor(el);
   const poster = child(el, "[data-poster]");
   if (!(place && poster)) {
     return null;
   }
-  const vW = vitrineWidth(place, rem, vw);
+  const vW = widthOverride ?? vitrineWidth(place, rem, vw);
   // Home the poster centred on the vitrine point: left/top are the point minus half
   // the width, so no centring translate is needed and the morph translate is pure.
   el.style.position = "absolute";
@@ -468,9 +506,171 @@ const buildShowRig = (
     // lives in `danceDelta`).
     danceUx: 0,
     danceUy: 0,
-    danceAmp: SHOW_SWAY_VW * vw,
+    danceAmp: sway * vw,
     danceSpin: 0,
   };
+};
+
+// ---- the PORTRAIT contact-sheet scatter (#27 Part C) ----
+//
+// The mobile twin of VITRINE. The portrait morph carries only THREE vessels (the
+// showpiece + Orray + Tempo); Scry + Ginevra are static flow cards and are never
+// rigged. These mirror the C.2 contact-sheet placement (the tall first screen
+// re-author) so the rest state of the FLIP is exactly the contact sheet the rest
+// slice already shipped. Placement is TOP-LEFT anchored (a fraction of the pinned
+// sheet for x/y, a fraction of the VIEWPORT WIDTH for w — the `Nvw` the sheet uses),
+// matching the global portrait re-author frame (globals.css @media max-width:640px).
+interface MobilePlacement {
+  /** Depth-of-field layer (reuses the desktop DEPTH_* tables). */
+  readonly depth: 1 | 2 | 3;
+  /** Vessel width as a fraction of the viewport width (square; height = width). */
+  readonly w: number;
+  /** Top-left x as a fraction of the pinned sheet width. */
+  readonly x: number;
+  /** Top-left y as a fraction of the pinned sheet height. */
+  readonly y: number;
+}
+
+const MOBILE_SCATTER: Record<string, MobilePlacement> = {
+  anypinn: { depth: 2, x: 0.27, y: 0.05, w: 0.46 },
+  orray: { depth: 1, x: 0.05, y: 0.64, w: 0.45 },
+  tempo: { depth: 3, x: 0.53, y: 0.7, w: 0.42 },
+};
+
+// Measure a PORTRAIT peer tile (Orray / Tempo) at its carousel-card home and derive the
+// viewport-fixed contact-sheet SOURCE it parks at; its target is its own card (identity),
+// exactly like the desktop buildPeerRig but for the single-column carousel. The carousel
+// is browser-pinned (position: sticky; top: 0) for the morph, so the card's pinned home
+// is its offset INSIDE the carousel container (`home.cy - carouselTop`) — scroll-stable
+// like the desktop grid. The scatter point is the top-left placement resolved to the
+// pinned sheet (its centre, in viewport px). Portrait peers do not dance for now (a
+// straight FLIP; a portrait choreography is a C.5 polish), so the dance fields are zero.
+const buildMobilePeerRig = (
+  el: HTMLElement,
+  place: MobilePlacement,
+  pinRect: DOMRect,
+  carouselTop: number,
+  vw: number
+): Rig | null => {
+  const poster = child(el, "[data-poster]");
+  if (!poster) {
+    return null;
+  }
+  const home = anchorPoster(el, poster);
+  const homeCx = home.cx;
+  const homeCy = home.cy - carouselTop;
+  const wPx = place.w * vw;
+  // The scatter vessel's centre in the pinned sheet (top-left + half its square box).
+  // Normalised to the pin's top: 0 (like the desktop vCy), so it is scroll-independent.
+  const vCx = pinRect.left + place.x * pinRect.width + wPx / 2;
+  const vCy = place.y * pinRect.height + wPx / 2;
+  return {
+    caption: child(el, "[data-caption]"),
+    depthBlur: DEPTH_BLUR[place.depth],
+    depthOpacity: DEPTH_OPACITY[place.depth],
+    el,
+    poster,
+    repoUrl: el.dataset.href ?? "",
+    showpiece: false,
+    srcDx: vCx - homeCx,
+    srcDy: vCy - homeCy,
+    srcScale: wPx / home.w,
+    tag: child(el, "[data-tag]"),
+    tgtDx: 0,
+    tgtDy: 0,
+    tgtScale: 1,
+    danceUx: 0,
+    danceUy: 0,
+    danceAmp: 0,
+    danceSpin: 0,
+  };
+};
+
+// Reuse the desktop buildShowRig for the PORTRAIT showpiece: convert its top-left
+// scatter to the CENTRE-fraction placement buildShowRig expects (top-left + half the
+// square box), and pass the vw width explicitly so the rem-clamp sizing is bypassed.
+// The S-curve set-aside / finale aim / scroll-stable target are all reused verbatim; the
+// only portrait retune (#27 C.5) is a narrower sway (MOBILE_SHOW_SWAY_VW) for the
+// centred portrait start.
+const buildMobileShowRig = (
+  showEl: HTMLElement,
+  pinRect: DOMRect,
+  rem: number,
+  vw: number,
+  landing: DOMRect | null
+): Rig | null => {
+  const place = MOBILE_SCATTER[content.showpiece.key];
+  const showW = place.w * vw;
+  return buildShowRig(
+    showEl,
+    pinRect,
+    rem,
+    vw,
+    landing,
+    {
+      depth: place.depth,
+      w: place.w,
+      x: place.x + showW / 2 / pinRect.width,
+      y: place.y + showW / 2 / pinRect.height,
+    },
+    showW,
+    // Portrait exit retune (#27 C.5): a narrower sway, since the portrait showpiece
+    // starts horizontally centred (above) rather than off to one side.
+    MOBILE_SHOW_SWAY_VW
+  );
+};
+
+// Resolve one carousel tile: a rigged portrait peer (Orray / Tempo) gets a FLIP rig;
+// anything else (Scry / Ginevra) is a STATIC flow card — resolved live now so it is
+// navigable from the start (the #27 observer that lights it is C.4). Returns the rig,
+// or null for a static card (which it mutates in place to the live phase).
+const buildCarouselRig = (
+  el: HTMLElement,
+  pinRect: DOMRect,
+  carouselTop: number,
+  vw: number
+): Rig | null => {
+  const place = el.dataset.key ? MOBILE_SCATTER[el.dataset.key] : undefined;
+  if (place) {
+    return buildMobilePeerRig(el, place, pinRect, carouselTop, vw);
+  }
+  el.dataset.phase = "live";
+  const href = el.dataset.href;
+  if (href) {
+    el.setAttribute("href", href);
+  }
+  return null;
+};
+
+// Centre the first carousel card (Orray) on the viewport middle during the pin, so the
+// morph lands it exactly on the proximity-snap centre (scroll-snap-align: center) when
+// the sticky releases — the #27 seam with no flicker. The carousel is browser-pinned at
+// top: 0, so we add lead padding above the cards equal to the gap between the card's
+// pinned centre and 50svh. Pinned-relative (minus the carousel top) so it is robust to
+// whatever scroll measure() runs at.
+const centerFirstCard = (
+  section: HTMLElement,
+  carousel: HTMLElement,
+  firstTile: HTMLElement | undefined,
+  vh: number
+) => {
+  section.style.paddingTop = "";
+  if (!firstTile) {
+    return;
+  }
+  // Clear any prior morph transform so the home reads the true (untransformed) box; the
+  // `.mobile` CSS pins the tile transition to none, so the clear is instant.
+  firstTile.style.transform = "";
+  const firstPoster = firstTile.querySelector<HTMLElement>("[data-poster]");
+  if (!firstPoster) {
+    return;
+  }
+  const carTop = carousel.getBoundingClientRect().top;
+  const r = firstPoster.getBoundingClientRect();
+  const centerWithin = r.top + r.height / 2 - carTop;
+  const curPad = Number.parseFloat(getComputedStyle(section).paddingTop) || 0;
+  const pad = Math.max(0, curPad + (0.5 * vh - centerWithin));
+  section.style.paddingTop = `${pad.toFixed(2)}px`;
 };
 
 // The dance deviation (viewport px) this vessel rides off its straight FLIP line at
@@ -579,18 +779,50 @@ interface Chrome {
   readonly vignette: HTMLElement;
 }
 
+// The chrome hand-off tuning. The desktop morph and the portrait morph share the SAME
+// dissolve timing (the smoothsteps below) but want a different exit GESTURE for the two
+// pieces of moving chrome, because a portrait viewport has far more vertical room:
+//   - thesisLift  rem the centred thesis rises as it hands the baton out;
+//   - batonDrop   rem the "DIVE IN ↓" scroll cue physically DROPS as it fades (0 keeps the
+//                 desktop cue a pure fade — its transform is then never touched, so the
+//                 desktop call stays byte-for-byte).
+interface ChromeTuning {
+  readonly batonDrop: number;
+  readonly thesisLift: number;
+}
+
+// Desktop (landscape) keeps its exact shipped numbers: a 2rem thesis lift and a pure-fade
+// baton (no drop). This is the default, so the desktop driveChrome call is unchanged.
+const DESKTOP_CHROME: ChromeTuning = { batonDrop: 0, thesisLift: 2 };
+// Portrait (#27 C.5): a tall viewport, so the thesis lifts a touch further and the
+// down-arrow "DIVE IN ↓" cue drops as it hands off, reading as the baton passed downward
+// into the scroll. Eyeball-tunable on a real phone.
+const MOBILE_CHROME: ChromeTuning = { batonDrop: 1.4, thesisLift: 3 };
+
 // The contact-sheet chrome hands the baton out: the grain and vignette dissolve, the
 // thesis rises + fades, the scroll cue drops. The accent wash is owned by the
 // coordinator at rest (hover) and once resolved (the lit card); only mid-flight does
-// the chrome release it, so a half-formed grid never carries a stale tint.
-const driveChrome = (chrome: Chrome, p: number, phase: Phase) => {
+// the chrome release it, so a half-formed grid never carries a stale tint. `tuning`
+// shapes the two moving-chrome exit gestures (desktop vs portrait); it defaults to the
+// desktop values so the MotionStage call is byte-for-byte.
+const driveChrome = (
+  chrome: Chrome,
+  p: number,
+  phase: Phase,
+  tuning: ChromeTuning = DESKTOP_CHROME
+) => {
   chrome.grain.style.opacity = (0.11 * (1 - smoothstep(0.2, 0.6, p))).toFixed(
     3
   );
   chrome.vignette.style.opacity = (1 - smoothstep(0.25, 0.62, p)).toFixed(3);
   chrome.copy.style.opacity = (1 - smoothstep(0.3, 0.66, p)).toFixed(3);
-  chrome.copy.style.transform = `translate(-50%, calc(-50% - ${(p * 2).toFixed(3)}rem))`;
+  chrome.copy.style.transform = `translate(-50%, calc(-50% - ${(p * tuning.thesisLift).toFixed(3)}rem))`;
   chrome.baton.style.opacity = (1 - Math.min(1, p * 6)).toFixed(3);
+  // The down-arrow cue drops as it fades on portrait; desktop (batonDrop 0) leaves the
+  // baton transform untouched, so its CSS translateX(-50%) centring is byte-for-byte.
+  if (tuning.batonDrop !== 0) {
+    chrome.baton.style.transform = `translate(-50%, ${(p * tuning.batonDrop).toFixed(3)}rem)`;
+  }
   // The grid's section label is the baton's counterpart: it hands IN as the grid
   // resolves (the same late ramp the peer captions use), so it is invisible over
   // the contact sheet and reads as the title of the settled grid. It lives in the
@@ -629,20 +861,42 @@ const restoreRig = (rig: Rig) => {
 };
 
 export function Stage() {
-  // Default to plain so SSR and the first client render agree; the effect upgrades to
-  // motion only where it is welcome.
+  // Default to plain so SSR and the first client render agree (no hydration
+  // mismatch); the effect upgrades to a morph only where it is welcome.
   const [mode, setMode] = useState<Mode>("plain");
 
   useEffect(() => {
-    const mql = window.matchMedia(MOTION_QUERY);
-    const sync = () => setMode("motion");
+    const desktop = window.matchMedia(MOTION_QUERY);
+    const mobile = window.matchMedia(MOBILE_MOTION_QUERY);
+    // The desktop morph wins where both could nominally apply (its 48rem floor and
+    // the mobile 40rem ceiling never overlap, but evaluating it first keeps the
+    // precedence explicit). Anything matching neither — reduced-motion, no-JS, or a
+    // 40-48rem fine pointer — stays plain. Re-evaluated on resize / orientation /
+    // pointer / reduced-motion change, so a window that crosses a boundary swaps
+    // cleanly instead of latching on the first match.
+    const sync = () => {
+      if (desktop.matches) {
+        setMode("motion");
+      } else if (mobile.matches) {
+        setMode("mobile");
+      } else {
+        setMode("plain");
+      }
+    };
     sync();
-    mql.addEventListener("change", sync);
-    return () => mql.removeEventListener("change", sync);
+    desktop.addEventListener("change", sync);
+    mobile.addEventListener("change", sync);
+    return () => {
+      desktop.removeEventListener("change", sync);
+      mobile.removeEventListener("change", sync);
+    };
   }, []);
 
   if (mode === "motion") {
     return <MotionStage />;
+  }
+  if (mode === "mobile") {
+    return <MobileMotionStage />;
   }
   return <PlainStage />;
 }
@@ -658,6 +912,588 @@ function PlainStage() {
         <ProofGrid />
       </ShowcaseRoot>
     </>
+  );
+}
+
+// MobileMotionStage — the portrait twin of MotionStage (#27 Part C), the
+// scroll-handoff FLIP morph that feeds the page-flow center-focus carousel on
+// phones. It is its OWN component, so the desktop MotionStage stays byte-for-byte
+// untouched (the explicit ownership contract of #27 Part C), but it reuses the same
+// PURE machinery — `drive`, `danceDelta`, `buildShowRig`, `restoreRig`, the `Rig`
+// type, the chrome driver — and the same sticky-pin-releases mechanic, so the two
+// share one physics.
+//
+// The contact sheet is the PIN; the page-flow carousel is the pulled-up sticky
+// `.gridStick`. Three vessels are rigged, the other two stream in:
+//   - the showpiece (AnyPINN) sets itself aside down toward the finale (the same
+//     buildShowRig set-aside the desktop uses, re-aimed + sway-retuned for portrait);
+//   - Orray morphs into carousel card #1 and LANDS ON THE VIEWPORT-CENTRED slot at
+//     the pin release, so the #27 proximity snap + observer pick it up with no flicker;
+//   - Tempo morphs into carousel card #2.
+// Orray + Tempo are ONE DOM node each (their home is the carousel card, pulled back to
+// the contact-sheet scatter at rest — exactly as the desktop peers are their grid
+// cells). Scry (#3) + Ginevra (#4) are NEVER rigged: static flow cards in the same
+// carousel <ul>.
+//
+// ONE lit coordinator spans every phase (#27 C.4): a coarse tap / fine hover lights a
+// vessel AT REST; the first scroll clears that and the tiles go INERT through the
+// flight; at the RELEASE (p === 1) the morph hands the four cards to the page-flow
+// carousel — it lights the centred card (Orray) and the #27 VIEWPORT observer takes
+// over, lighting Tempo / Scry / Ginevra (and firing the snap haptic) as each reaches
+// the centre band. The hand-off is seamless: the rig releases its inline transform so
+// the proof card's own recede + [data-active] bloom own the cards (`.released`, see
+// stage.module.css), the seam seeds the lit centre so there is no dark frame and the
+// observer's first tick is a no-op (no double-light).
+//
+// The chrome hand-off + the showpiece exit are portrait-retuned (#27 C.5): a taller
+// thesis lift, a dropping "DIVE IN ↓" baton (MOBILE_CHROME), and a narrower set-aside
+// sway for the centred portrait showpiece (MOBILE_SHOW_SWAY_VW).
+function MobileMotionStage() {
+  const stageRef = useRef<HTMLDivElement>(null);
+  const pinRef = useRef<HTMLDivElement>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const vitrineRef = useRef<HTMLDivElement>(null);
+  const grainRef = useRef<HTMLDivElement>(null);
+  const vignetteRef = useRef<HTMLDivElement>(null);
+  const copyRef = useRef<HTMLDivElement>(null);
+  const batonRef = useRef<HTMLParagraphElement>(null);
+  const labelRef = useRef<HTMLHeadingElement>(null);
+
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    const pin = pinRef.current;
+    const carousel = carouselRef.current;
+    const section = sectionRef.current;
+    const vitrine = vitrineRef.current;
+    const grain = grainRef.current;
+    const vignette = vignetteRef.current;
+    const copy = copyRef.current;
+    const baton = batonRef.current;
+    if (
+      !(
+        stage &&
+        pin &&
+        carousel &&
+        section &&
+        vitrine &&
+        grain &&
+        vignette &&
+        copy &&
+        baton
+      )
+    ) {
+      return;
+    }
+    const label = labelRef.current;
+    if (!label) {
+      return;
+    }
+    const chrome: Chrome = { baton, copy, grain, label, pin, vignette };
+
+    let rigs: Rig[] = [];
+    const rigByEl = new Map<HTMLElement, Rig>();
+    // The four carousel cards in document order ([Orray, Tempo, Scry, Ginevra]) — the
+    // #27 viewport observer + the release seam read positions off these, so they are
+    // re-captured each measure() (the same nodes survive a reflow, but the array is
+    // rebuilt for clarity).
+    let carouselTiles: HTMLElement[] = [];
+
+    // FLIP measurement (portrait): rig Orray + Tempo from their carousel-card homes to
+    // the contact-sheet scatter, rig the showpiece's set-aside, and centre Orray's
+    // card on the viewport so the morph lands it on the proximity-snap centre.
+    const measure = () => {
+      const pinRect = pin.getBoundingClientRect();
+      const rem =
+        Number.parseFloat(
+          getComputedStyle(document.documentElement).fontSize
+        ) || 16;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      const tiles = Array.from(
+        carousel.querySelectorAll<HTMLElement>("a[data-key]")
+      );
+      carouselTiles = tiles;
+
+      // Centre Orray's card on the viewport middle during the pin (the #27 seam), then
+      // read each card's PINNED home (the carousel is browser-pinned at top: 0, so its
+      // container top recovers the home regardless of scroll).
+      centerFirstCard(section, carousel, tiles[0], vh);
+      const carouselTop = carousel.getBoundingClientRect().top;
+
+      rigs = [];
+      rigByEl.clear();
+      for (const el of tiles) {
+        const rig = buildCarouselRig(el, pinRect, carouselTop, vw);
+        if (rig) {
+          rigs.push(rig);
+          rigByEl.set(el, rig);
+        }
+      }
+
+      // The showpiece's set-aside, aimed at the finale landing slot when present (its
+      // width + x are scroll-stable, so the live rect is robust to any scroll).
+      const landingEl = document.querySelector<HTMLElement>(
+        "[data-finale-landing]"
+      );
+      const landing = landingEl?.getBoundingClientRect() ?? null;
+      const showEl = vitrine.querySelector<HTMLElement>("a[data-key]");
+      const showRig = showEl
+        ? buildMobileShowRig(showEl, pinRect, rem, vw, landing)
+        : null;
+      if (showRig) {
+        rigs.push(showRig);
+        rigByEl.set(showRig.el, showRig);
+      }
+
+      // Size the stage so the carousel's sticky pin RELEASES exactly when the morph
+      // completes: it stays pinned for the first MORPH_END of a viewport of scroll, then
+      // un-sticks and scrolls to its end (the page-flow carousel). The sticky
+      // stick-distance equals stageHeight - carouselHeight.
+      const carouselHeight = carousel.offsetHeight;
+      stage.style.height = `${(carouselHeight + MORPH_END * vh).toFixed(2)}px`;
+    };
+
+    // ---- the single-lit coordinator (rest hover/tap -> inert flight -> morph lights
+    //      the centre at release -> the #27 viewport observer owns the carousel) ----
+    let phase: Phase = "rest";
+    let lastProgress = -1;
+    let activeEl: HTMLElement | null = null;
+    let focusedEl: HTMLElement | null = null;
+    // The key the #27 observer last SETTLED at centre, so the snap haptic fires once
+    // per NEW centre (not on every observer tick), and so the release seam can seed it
+    // (it lights Orray, so the observer's first Orray tick is a no-op, not a re-buzz).
+    let centeredKey: string | null = null;
+    // The snap haptic is pure progressive enhancement and is off under reduced motion
+    // (the mobile morph only ever mounts under no-preference, so this is belt-and-braces).
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    // Live primary-pointer read: a coarse (touch) pointer taps to light and KEEPS lit;
+    // a fine pointer (a narrow desktop window, or a hovering pen) lights on hover. Read
+    // from a media query updated in place, so a hybrid device flips without re-running
+    // this whole effect.
+    const coarseMql = window.matchMedia("(pointer: coarse)");
+    let coarse = coarseMql.matches;
+    const onCoarseChange = () => {
+      coarse = coarseMql.matches;
+    };
+    coarseMql.addEventListener("change", onCoarseChange);
+
+    const setActive = (el: HTMLElement | null) => {
+      if (el === activeEl) {
+        return;
+      }
+      if (activeEl) {
+        activeEl.dataset.active = "false";
+      }
+      activeEl = el;
+      if (el) {
+        el.dataset.active = "true";
+        const accent = el.style.getPropertyValue("--accent").trim();
+        if (accent) {
+          pin.style.setProperty("--live-accent", accent);
+        }
+      } else {
+        pin.style.removeProperty("--live-accent");
+      }
+    };
+
+    // Light a tile. At rest a rigged tile is re-driven so it lifts + clears its blur in
+    // place (there is no scroll frame to do it); a static card's loud look is its own
+    // [data-active] CSS, so only the accent + flag change.
+    const redrive = (el: HTMLElement | null, lit: boolean) => {
+      const rig = el ? rigByEl.get(el) : undefined;
+      if (rig) {
+        drive(rig, lastProgress, lit);
+      }
+    };
+    const light = (el: HTMLElement | null) => {
+      const prev = activeEl;
+      setActive(el);
+      if (phase !== "rest") {
+        return;
+      }
+      if (prev !== el) {
+        redrive(prev, false);
+      }
+      redrive(el, true);
+    };
+
+    // The carousel card whose poster centre sits nearest the viewport's vertical middle
+    // — the one the page-flow carousel reads as "centred". Used to seed the lit card at
+    // the morph release (Orray lands centred there) so the hand-off to the observer
+    // starts from an already-lit centre, with no dark frame.
+    const centeredCard = (): HTMLElement | null => {
+      const mid = window.innerHeight / 2;
+      let best: HTMLElement | null = null;
+      let bestDist = Number.POSITIVE_INFINITY;
+      for (const el of carouselTiles) {
+        const poster = el.querySelector<HTMLElement>("[data-poster]");
+        const box = (poster ?? el).getBoundingClientRect();
+        const dist = Math.abs(box.top + box.height / 2 - mid);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = el;
+        }
+      }
+      return best;
+    };
+
+    // The release seam: at p === 1 the morph has landed the centred card (Orray) exactly
+    // on the proximity-snap centre. Light it and seed `centeredKey`, so the #27 observer
+    // takes over from an ALREADY-lit centre — no double-light (the observer's first tick
+    // on Orray is a no-op + no re-buzz) and no dark frame.
+    const lightCentered = () => {
+      const el = centeredCard();
+      if (!el) {
+        return;
+      }
+      light(el);
+      centeredKey = el.dataset.key ?? null;
+    };
+
+    // Hand a landed peer (Orray / Tempo) to the page-flow carousel: drop the rig's
+    // per-frame transform / opacity / filter so the proof card's OWN mobile recede +
+    // [data-active] bloom (and its 0.45s settle) govern it again — identical to the
+    // static cards and the standalone grid (see stage.module.css `.released`). Its
+    // data-phase ("live"), href (navigability), and lit flag are preserved.
+    const releaseToCarousel = (rig: Rig) => {
+      const s = rig.el.style;
+      s.transform = "";
+      s.opacity = "";
+      s.transformOrigin = "";
+      rig.poster.style.filter = "";
+      rig.poster.style.borderRadius = "";
+      if (rig.tag) {
+        rig.tag.style.opacity = "";
+      }
+      if (rig.caption) {
+        rig.caption.style.opacity = "";
+      }
+    };
+
+    // The #27 observer's settle: the card that just reached the centre band becomes the
+    // single loud one (through the same coordinator), and a NEW centre fires the snap
+    // haptic (Android buzzes; iOS Safari has no Vibration API and silently no-ops; off
+    // under reduced motion). Only acts once the morph has released to the carousel
+    // (phase "live"); during rest / flight the morph owns lighting and these ticks
+    // (rigged tiles transforming through centre) are ignored.
+    const settle = (el: HTMLElement) => {
+      if (phase !== "live") {
+        return;
+      }
+      light(el);
+      const key = el.dataset.key;
+      if (key && key !== centeredKey) {
+        centeredKey = key;
+        if (!reduce && typeof navigator.vibrate === "function") {
+          navigator.vibrate(8);
+        }
+      }
+    };
+
+    // A rig's interactivity phase WHILE THE MORPH RUNS: the showpiece reads phaseFor (it
+    // never goes live — it sets itself aside); a peer is the rest vessel at the very top
+    // and inert flight through the whole morph. A peer only becomes a navigable, CSS-owned
+    // carousel card at the release (p === 1), which apply() drives directly.
+    const morphPhase = (rig: Rig, p: number): Phase => {
+      if (rig.showpiece) {
+        return phaseFor(p, true);
+      }
+      return p <= HERO_REST ? "rest" : "flight";
+    };
+
+    // The stage phase: rest at the very top, inert flight through the morph, and live
+    // ONLY at the release (p === 1) — not at RESOLVE_AT — so the per-frame FLIP never
+    // wears the carousel transition and the rig -> CSS hand-off happens in one clean step.
+    const stagePhase = (p: number, landed: boolean): Phase => {
+      if (landed) {
+        return "live";
+      }
+      return p <= HERO_REST ? "rest" : "flight";
+    };
+
+    // Drive every rig for the current progress. Landed peers are RELEASED to the page
+    // -flow carousel (CSS owns recede + bloom); everything else (the still-morphing peers
+    // and the always-rig-driven showpiece set-aside) rides the FLIP.
+    const driveRigs = (p: number, landed: boolean) => {
+      for (const rig of rigs) {
+        if (landed && !rig.showpiece) {
+          releaseToCarousel(rig);
+          setPhase(rig, "live");
+        } else {
+          drive(rig, p, phase === "rest" && rig.el === activeEl);
+          setPhase(rig, morphPhase(rig, p));
+        }
+      }
+    };
+
+    const apply = (p: number) => {
+      stage.style.setProperty("--p", p.toFixed(4));
+      const landed = p >= 1;
+      phase = stagePhase(p, landed);
+      // Leaving rest for the inert flight drops any hover/tap lighting so a half-formed
+      // card is never lit. The release (landed) keeps the centred card lit instead.
+      if (!landed && phase !== "rest" && activeEl) {
+        setActive(null);
+      }
+      // Flip the released gate so the proof card's own recede + transition take the
+      // four cards back once the carousel free-scrolls (stage.module.css `.released`).
+      stage.classList.toggle(styles.released, landed);
+      driveChrome(chrome, p, phase, MOBILE_CHROME);
+      driveRigs(p, landed);
+      // At the release, light the centred card so the #27 observer inherits an already
+      // -lit centre (no dark frame). Skipped if a card is already lit (the observer or a
+      // prior released frame owns it), so the seam never double-lights.
+      if (landed && !activeEl) {
+        lightCentered();
+      }
+    };
+
+    const compute = () => {
+      // The morph runs over the first MORPH_END of a viewport of scroll, where the
+      // carousel stays sticky-pinned; -top is how far the stage top has scrolled above
+      // the viewport top.
+      const travel = window.innerHeight;
+      const top = stage.getBoundingClientRect().top;
+      const raw = travel > 0 ? clamp(-top / travel, 0, 1) : 0;
+      const progress = clamp(raw / MORPH_END, 0, 1);
+      if (progress === lastProgress) {
+        return;
+      }
+      lastProgress = progress;
+      apply(progress);
+    };
+
+    const tileFrom = (target: EventTarget | null): HTMLElement | null =>
+      target instanceof Element
+        ? target.closest<HTMLElement>("a[data-key]")
+        : null;
+    // A tile may be lit at rest (any rigged tile) or once resolved (a live card).
+    const lightable = (el: HTMLElement): boolean =>
+      phase === "rest" || el.dataset.phase === "live";
+
+    // Fine-pointer (hover / pen) lighting — never bound on a coarse tap-scroll.
+    const onOver = (event: PointerEvent) => {
+      if (coarse) {
+        return;
+      }
+      const el = tileFrom(event.target);
+      if (el) {
+        if (lightable(el)) {
+          light(el);
+        }
+        return;
+      }
+      light(focusedEl);
+    };
+    const onLeave = () => {
+      if (!coarse) {
+        light(focusedEl);
+      }
+    };
+    // Keyboard focus lights on either pointer (assistive / hardware keyboard).
+    const onFocusIn = (event: FocusEvent) => {
+      const el = tileFrom(event.target);
+      if (el && lightable(el)) {
+        focusedEl = el;
+        light(el);
+      }
+    };
+    const onFocusOut = () => {
+      focusedEl = null;
+    };
+    // Coarse-pointer tap: light a tile and KEEP it lit (re-tap replays its lift, never
+    // toggles off). A tap that resolves nothing is left to the outside-dismiss below.
+    const onClick = (event: MouseEvent) => {
+      if (!coarse) {
+        return;
+      }
+      const el = tileFrom(event.target);
+      if (el && lightable(el)) {
+        light(el);
+      }
+    };
+    // Touch dismissal: a tap outside every tile releases the lit one (a tap on a tile is
+    // handled by onClick and must not also dismiss).
+    const onDocPointerDown = (event: PointerEvent) => {
+      if (!(coarse && activeEl)) {
+        return;
+      }
+      if (!tileFrom(event.target)) {
+        light(null);
+      }
+    };
+
+    let raf = 0;
+    const onScroll = () => {
+      if (raf === 0) {
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          compute();
+        });
+      }
+    };
+    const remeasure = () => {
+      measure();
+      lastProgress = -1;
+      compute();
+    };
+
+    measure();
+    compute();
+    // Enable the eased rest transitions only after the initial placement paints, so the
+    // first frame snaps the tiles into the contact sheet instead of animating them out
+    // of the carousel.
+    const readyRaf = requestAnimationFrame(() =>
+      stage.classList.add(styles.ready)
+    );
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", remeasure);
+    // Enable the handoff's proximity scroll-snap (Part B / #27). The document is the
+    // scroller, so the snap type lives on the root element; it is scoped to this stage's
+    // lifetime and is `proximity` — never `mandatory` — so it only assists a half-finished
+    // handoff and never traps free scroll. The carousel items carry scroll-snap-align:
+    // center (proof-grid mobile CSS), so a settled scroll eases the nearest card to centre.
+    const rootStyle = document.documentElement.style;
+    const prevSnapType = rootStyle.scrollSnapType;
+    rootStyle.scrollSnapType = "y proximity";
+
+    // The coordinator listens on the whole stage so it catches both the carousel cards
+    // and the absolutely-placed showpiece in the pin's vitrine layer.
+    stage.addEventListener("pointerover", onOver);
+    stage.addEventListener("pointerleave", onLeave);
+    stage.addEventListener("focusin", onFocusIn);
+    stage.addEventListener("focusout", onFocusOut);
+    stage.addEventListener("click", onClick);
+    document.addEventListener("pointerdown", onDocPointerDown);
+
+    // The carousel box (and so the scatter deltas + the Orray-centre lead) can shift
+    // after web fonts swap in or any reflow; re-measure so the FLIP stays true.
+    const observer = new ResizeObserver(remeasure);
+    observer.observe(carousel);
+
+    // The #27 center-focus observer (the SAME mechanic the standalone ProofGrid uses):
+    // viewport-rooted (`root: null`, the cards flow in the page's own scroll), watching a
+    // thin band at the viewport's vertical centre. Once the morph has released (phase
+    // "live"), the card that lands in the band becomes the single loud one and a new
+    // centre fires the snap haptic — so a swipe lights Tempo, then Scry, then Ginevra.
+    // It observes through rest / flight too, but `settle` ignores those ticks (the morph
+    // owns lighting until the release), which is what unifies the two systems into one.
+    const centerObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            settle(entry.target as HTMLElement);
+          }
+        }
+      },
+      { root: null, rootMargin: "-45% 0px -45% 0px", threshold: 0 }
+    );
+    for (const tile of carouselTiles) {
+      centerObserver.observe(tile);
+    }
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", remeasure);
+      stage.removeEventListener("pointerover", onOver);
+      stage.removeEventListener("pointerleave", onLeave);
+      stage.removeEventListener("focusin", onFocusIn);
+      stage.removeEventListener("focusout", onFocusOut);
+      stage.removeEventListener("click", onClick);
+      document.removeEventListener("pointerdown", onDocPointerDown);
+      coarseMql.removeEventListener("change", onCoarseChange);
+      observer.disconnect();
+      centerObserver.disconnect();
+      if (raf !== 0) {
+        cancelAnimationFrame(raf);
+      }
+      cancelAnimationFrame(readyRaf);
+      stage.classList.remove(styles.ready);
+      stage.classList.remove(styles.released);
+      for (const rig of rigs) {
+        restoreRig(rig);
+      }
+      grain.style.opacity = "";
+      vignette.style.opacity = "";
+      copy.style.opacity = "";
+      copy.style.transform = "";
+      baton.style.opacity = "";
+      baton.style.transform = "";
+      label.style.opacity = "";
+      pin.style.removeProperty("--live-accent");
+      pin.removeAttribute("data-settling");
+      stage.style.height = "";
+      section.style.paddingTop = "";
+      rootStyle.scrollSnapType = prevSnapType;
+    };
+  }, []);
+
+  return (
+    <div className={`${styles.stage} ${styles.mobile}`} ref={stageRef}>
+      <div className={styles.pin} ref={pinRef}>
+        <div className={styles.tint} />
+        <div className={styles.grain} ref={grainRef} />
+
+        {/* the showpiece tile — its DOM home is the contact sheet, never the
+            carousel; it sets itself aside off-screen, aimed at the finale's landing
+            slot when the attractor is present below (else straight down) */}
+        <div className={styles.vitrine} ref={vitrineRef}>
+          <ProjectTile model={SHOWPIECE_MODEL} />
+        </div>
+
+        <div className={styles.vignette} ref={vignetteRef} />
+
+        <div className={`vitrine__copy ${styles.copy}`} ref={copyRef}>
+          <p className="eyebrow">{content.hero.eyebrow}</p>
+          <h1 aria-label={content.hero.thesis} className="thesis">
+            {content.hero.thesisLines.map((line) => (
+              <span className="thesis__line" key={line}>
+                {line}
+              </span>
+            ))}
+          </h1>
+          <p className="subline">{content.hero.subline}</p>
+        </div>
+
+        <p className={`scroll-baton ${styles.baton}`} ref={batonRef}>
+          {content.hero.scrollBaton}
+        </p>
+      </div>
+
+      {/* the page-flow carousel's home — pulled up over the pinned contact sheet
+          (negative margin) and BROWSER-PINNED there (position: sticky) for the morph,
+          so Orray + Tempo morph across it by pure transform with no JS scroll
+          compensation (no jitter). When the morph completes the sticky releases and
+          this scrolls away as the #27 page-flow carousel, read to its end. Orray (#1)
+          + Tempo (#2) are rigged; Scry (#3) + Ginevra (#4) are static flow cards. */}
+      <div className={styles.gridStick} ref={carouselRef}>
+        <section className={proofStyles.section} ref={sectionRef}>
+          {/* the carousel's section title — invisible over the contact sheet, handed
+              in by the stage (opacity on --p) as the cards settle. */}
+          <h2 className={proofStyles.label} ref={labelRef}>
+            {content.work.label}
+          </h2>
+          <ul className={proofStyles.grid}>
+            {PEER_MODELS.map((model) => (
+              <li className={proofStyles.item} key={model.key}>
+                <ProjectTile model={model} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+
+      {/* the contact-sheet rest snap point (Part B / #27): an invisible, zero-size
+          proximity snap target at the stage top; the carousel items carry their own
+          scroll-snap-align: center for the resolved cards, so the morph lands Orray on
+          the centred slot and free scroll is never trapped. */}
+      <div className={`${styles.snap} ${styles.snapRest}`} />
+    </div>
   );
 }
 

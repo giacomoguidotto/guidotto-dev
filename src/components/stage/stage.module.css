@@ -282,3 +282,45 @@
 .snapRest {
   top: 0;
 }
+
+/* ---- the mobile portrait morph (#27 C.3) ---- */
+
+/* MobileMotionStage is the PORTRAIT TWIN of the desktop morph: it reuses the desktop
+   scene classes wholesale (.stage / .pin / .gridStick / .vitrine / .tint / .grain /
+   .vignette / .copy / .baton / .snap) — the contact sheet IS the pin, the page-flow
+   carousel IS the pulled-up sticky grid — and only adds the `.mobile` modifier below.
+   The single-column carousel layout + the per-card centre snap come from the proof
+   grid's own mobile CSS (proof-grid.module.css @media max-width: 40rem). C.2's
+   standalone .sheet / .vessels / .case block is gone: the three vessels are now one
+   DOM node each, rigged by the stage, exactly as the desktop peers are their cells. */
+
+/* The morph carousel + showpiece tiles: WHILE THE MORPH RUNS (not `.released`) the JS
+   rig owns transform + opacity per scroll frame, so neutralise the proof card's mobile
+   CAROUSEL RECEDE (the scale .88 / dim-to-0.5 the #27 observer toggles) AND every eased
+   transition ON THE TILE. Two reasons the transition must be off here: the per-frame
+   FLIP must never lag the scroll, and measure() clears each tile's transform to read its
+   true card box — with a live transition that clear would be caught mid-animation and
+   report a wrong home (the desktop `.ready`-drop, earned for free by killing the
+   transition outright). The rig's inline transform/opacity win over `none`/`1` for Orray
+   + Tempo + the showpiece; the static cards (Scry + Ginevra) simply sit full-size and
+   clear. The second selector outranks `.ready .tile[data-phase="rest"]` so the at-rest
+   hover ease can't sneak the transition back in.
+
+   AT THE RELEASE (`.released`, added from JS at p === 1, the seam where the carousel
+   un-sticks into the page's own scroll) this neutralisation is dropped — the `:not`
+   stops matching — so the proof card's OWN mobile recede + 0.45s settle + [data-active]
+   bloom take the four cards back, identical to the standalone grid: the #27 observer's
+   loud card sits full + clear and its neighbours recede, with the rig's inline styles
+   already cleared (releaseToCarousel) so CSS wins. The showpiece keeps its own inline
+   set-aside transform (rig-driven off-screen), so CSS recede can't pull it back in.
+
+   max-width / margin-inline (the proof card's mobile sizing) are deliberately KEPT, so
+   the rig measures the same card box the resolved carousel uses. */
+@media (max-width: 40rem) {
+  .mobile:not(.released) .tile,
+  .mobile.ready:not(.released) .tile[data-phase="rest"] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
