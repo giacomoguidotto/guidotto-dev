@@ -64,7 +64,7 @@ type Phase = "rest" | "flight" | "live";
 // 40rem carousel switch, so the two layouts never fight). Everything else gets the
 // plain sectioned story.
 const MOTION_QUERY =
-  "(pointer: fine) and (prefers-reduced-motion: no-preference) and (min-width: 1px)";
+  "(pointer: fine) and (prefers-reduced-motion: no-preference) and (min-width: 48rem)";
 
 // The morph completes over the first MORPH_END of the one-viewport pin; the rest is
 // a hold where the resolved grid reads as a normal grid before the page continues.
