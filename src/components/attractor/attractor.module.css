@@ -529,6 +529,14 @@
   .landing {
     width: clamp(4rem, 18vw, 5rem);
   }
+
+  /* hold the loss chart at the desktop width: its base clamp's 18vw term collapses
+     it to the 5.5rem floor on a phone, shrinking the read versus the web version.
+     Pin it to the clamp's 9rem ceiling so the chart reads the same here (the
+     PARAMETERS column + this chart still fit the portrait HUD down to ~320px). */
+  .lossChartBox {
+    width: 9rem;
+  }
 }
 
 /* reduced motion: the loading wash never pulses (the scene itself renders a
