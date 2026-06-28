@@ -1,14 +1,14 @@
-/* not-found (404) — a calm chrome surface on the cool stage.
+/* status surfaces — the calm chrome shared by the 404 (not-found), the runtime
+   error boundary (error / global-error), and the brief loading fallback.
 
-   Co-located module CSS, kept OUT of globals.css so this page owns its own
-   surface and never merge-conflicts with the home-page slices. It only READS the
-   global design tokens (the stage tokens --stage-*, the warm --ivory, the deep
-   floor --stage-deep, the grain texture --grain, the mono/display fonts); it
-   never edits them.
+   One co-located module so every status surface reads as the same site. It only
+   READS the global design tokens (the stage tokens --stage-*, the warm --ivory,
+   the deep floor --stage-deep, the grain texture --grain, the mono/display
+   fonts); it never edits them.
 
-   The composition mirrors the hero so the page reads as the same site: a mono
-   eyebrow, a Fraunces line, an italic subline, then one quiet pill back home
-   (the contact door's closed-pill recipe). The two system-signal blocks at the
+   The composition mirrors the hero: a mono eyebrow, a Fraunces line, an italic
+   subline, then the actions row (a loud filled pill for the primary action, a
+   quiet outlined pill for the way home). The two system-signal blocks at the
    foot (reduced-motion, reduced-transparency / increased-contrast) match the
    rest of the design language. */
 
@@ -117,13 +117,49 @@
   opacity: 0.86;
 }
 
-/* one quiet pill back to the home page (the contact door's closed-pill recipe) */
+/* ---------- actions ---------- */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.6rem;
+}
+
+/* the loud filled pill (the contact door's Send recipe) — the primary action */
+.retry {
+  padding: 0.8rem 1.6rem;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.78rem;
+  color: var(--stage-3);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  background: var(--ivory);
+  border: none;
+  border-radius: 999px;
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.retry:hover {
+  transform: translateY(-1px);
+}
+
+.retry:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--ivory) 70%, transparent);
+  outline-offset: 3px;
+}
+
+/* the quiet outlined pill (the contact door's closed-pill recipe) — the way home */
 .home {
   display: inline-flex;
   gap: 0.55rem;
   align-items: center;
   padding: 0.8rem 1.5rem;
-  margin-top: 0.6rem;
   font-family: var(--font-mono), monospace;
   font-size: 0.82rem;
   color: var(--ivory);
@@ -156,6 +192,21 @@
   transform: translateX(-0.2rem);
 }
 
+/* ---------- loading: a quiet pulsing label ---------- */
+.pulse {
+  animation: statusPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%,
+  100% {
+    opacity: 0.38;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
 /* ---------- short / narrow viewports: shrink the line like the hero ---------- */
 @media (max-width: 640px) {
   .copy {
@@ -170,14 +221,18 @@
   }
 }
 
-/* ---------- reduced motion: freeze the pill / arrow ---------- */
+/* ---------- reduced motion: freeze the pills, the arrow, the pulse ---------- */
 @media (prefers-reduced-motion: reduce) {
   .home,
-  .homeArrow {
+  .homeArrow,
+  .retry,
+  .pulse {
     transition: none;
+    animation: none;
   }
 
-  .home:hover .homeArrow {
+  .home:hover .homeArrow,
+  .retry:hover {
     transform: none;
   }
 }

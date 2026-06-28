@@ -1,24 +1,9 @@
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
-import { Fraunces, JetBrains_Mono } from "next/font/google";
 import { content } from "~/content";
+import { fraunces, jetbrainsMono } from "./fonts";
 import "./globals.css";
-
-// Warm, optical, characterful serif — the display thesis voice (analog warmth in
-// its forms, regardless of color). Loaded globally.
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  style: ["normal", "italic"],
-  variable: "--font-fraunces",
-  axes: ["SOFT", "WONK", "opsz"],
-});
-
-// The engineering register — small labels, eyebrows, CTA.
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-jetbrains",
-});
 
 const { site } = content;
 const logoUrl = new URL("/logo.svg", site.url).toString();

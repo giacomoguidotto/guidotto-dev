@@ -116,6 +116,23 @@ export interface NotFoundContent {
   readonly title: string;
 }
 
+export interface ErrorContent {
+  /** Back-home link label. */
+  readonly cta: string;
+  /** Mono eyebrow (functional chrome, not a tagline). */
+  readonly eyebrow: string;
+  /** Primary action: re-render the failed segment. */
+  readonly retry: string;
+  readonly subline: string;
+  /** Fraunces line. */
+  readonly title: string;
+}
+
+export interface LoadingContent {
+  /** Mono fallback label shown during navigation. */
+  readonly label: string;
+}
+
 export interface HumanContent {
   readonly personalLine: string;
   /** Script signature word (handwritten SVG pending Jack's source picture). */
@@ -143,8 +160,10 @@ export interface CtaContent {
 
 export interface Content {
   readonly cta: CtaContent;
+  readonly error: ErrorContent;
   readonly hero: HeroContent;
   readonly human: HumanContent;
+  readonly loading: LoadingContent;
   readonly mission: MissionContent;
   readonly notFound: NotFoundContent;
   readonly projects: readonly Project[];
@@ -286,6 +305,22 @@ export const content: Content = {
     title: "This page doesn't exist.",
     subline: "Let's get you back to the work.",
     cta: "Back home",
+  },
+
+  // Functional runtime-error chrome (shared by error.tsx and global-error.tsx).
+  // The subline keeps the warm first-person voice; the actions carry the way
+  // forward (retry) and the way out (home).
+  error: {
+    eyebrow: "ERROR",
+    title: "Something went wrong.",
+    subline: "This one's on me, not you.",
+    retry: "Try again",
+    cta: "Back home",
+  },
+
+  // The brief navigation/Suspense fallback label.
+  loading: {
+    label: "LOADING",
   },
 
   cta: {
