@@ -1104,6 +1104,15 @@ function MobileMotionStage() {
     // re-captured each measure() (the same nodes survive a reflow, but the array is
     // rebuilt for clarity).
     let carouselTiles: HTMLElement[] = [];
+    // The morph's scroll distance (px), captured in measure() as MORPH_END * the
+    // viewport height the stage was SIZED with — i.e. the sticky stick-distance
+    // (stageHeight - carouselHeight). compute() maps progress against THIS, not a live
+    // window.innerHeight, so p === 1 always lands exactly where the carousel sticky
+    // RELEASES. Reading innerHeight live in compute() instead would desync the two when
+    // the viewport height changes between measure and scroll (the mobile URL bar, the
+    // soft keyboard, a view transition): the carousel would un-stick while p was still
+    // < 1, stranding the showpiece set-aside in mid-flight over the resolved cards.
+    let morphTravel = 0;
 
     // FLIP measurement (portrait): rig Orray + Tempo from their carousel-card homes to
     // the contact-sheet scatter, rig the showpiece's set-aside, and centre Orray's
@@ -1159,6 +1168,11 @@ function MobileMotionStage() {
       // stick-distance equals stageHeight - carouselHeight.
       const carouselHeight = carousel.offsetHeight;
       stage.style.height = `${(carouselHeight + MORPH_END * vh).toFixed(2)}px`;
+      // The stick-distance the stage was just sized to: compute() maps progress to 1
+      // exactly here, so the morph completes the instant the carousel sticky releases —
+      // even if window.innerHeight differs by the time the user scrolls (URL bar /
+      // keyboard / view transition between this measure and that scroll).
+      morphTravel = MORPH_END * vh;
     };
 
     // ---- the single-lit coordinator (rest hover/tap -> inert flight -> morph lights
@@ -1379,11 +1393,13 @@ function MobileMotionStage() {
     const compute = () => {
       // The morph runs over the first MORPH_END of a viewport of scroll, where the
       // carousel stays sticky-pinned; -top is how far the stage top has scrolled above
-      // the viewport top.
-      const travel = window.innerHeight;
+      // the viewport top. Progress is mapped against morphTravel (the stick-distance
+      // captured in measure()), NOT a live window.innerHeight, so p === 1 lands exactly
+      // where the carousel releases regardless of any viewport-height change since the
+      // last measure — otherwise the showpiece set-aside strands mid-flight over the
+      // already-resolved cards (the URL-bar / soft-keyboard / view-transition seam).
       const top = stage.getBoundingClientRect().top;
-      const raw = travel > 0 ? clamp(-top / travel, 0, 1) : 0;
-      const progress = clamp(raw / MORPH_END, 0, 1);
+      const progress = morphTravel > 0 ? clamp(-top / morphTravel, 0, 1) : 0;
       if (progress === lastProgress) {
         return;
       }
