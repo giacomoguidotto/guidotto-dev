@@ -432,21 +432,18 @@
   outline-offset: 4px;
 }
 
-/* the glass frame over the small vessel: rim light, gloss, specular, inner shadow
-   (token-driven) — the same CSS-faked glass the contact-sheet vessels wear. */
+/* the glass frame over the small vessel: the shared .glass-frame (rim light,
+   gloss, specular, inner shadow) — the same one source the contact-sheet vessels
+   wear, applied as a global class in the markup alongside this class. Shallower
+   inner shadow than the hero vessels (the parked vessel is smaller), tuned
+   through the depth knobs. */
 .vesselGlass {
+  --glass-depth-y: -22px;
+  --glass-depth-blur: 44px;
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background:
-    linear-gradient(150deg, var(--glass-rim) 0%, transparent 32%),
-    radial-gradient(120% 80% at 28% 12%, var(--glass-gloss) 0%, transparent 46%);
-  border: 1px solid var(--glass-border);
-  border-radius: inherit;
-  box-shadow:
-    inset 0 1px 1px var(--glass-specular),
-    inset 0 -22px 44px var(--glass-inner-shadow);
 }
 
 .landingTag {

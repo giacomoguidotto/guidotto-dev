@@ -352,13 +352,19 @@ body {
   object-fit: cover;
 }
 
-/* the "glass": rim light, top gloss, specular, inner shadow (token-driven) —
-   never distorts the content underneath */
-.vessel__glass {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
+/* ---- the shared glass frame: ONE source for the rim / top-gloss / specular /
+   inner-shadow layer stack (token-driven), never a lens that distorts the content
+   underneath. Every glass surface consumes THIS as a global class applied in the
+   markup alongside the surface's own positioning class — the hero vessels
+   (`vessel__glass glass-frame`), the proof cards + morph tile, the finale parked
+   vessel and the portrait frame. The only thing that varies between surfaces is
+   how deep the bottom inner
+   shadow sits (it scales with the surface), so that is the one knob each surface
+   tunes: --glass-depth-y / --glass-depth-blur, defaulting to the vessel depth.
+   The wash tokens still null to transparent on :root under reduced-transparency, so
+   the glass -> solid-frame collapse stays defined once and now has a single
+   consumer to collapse. ---- */
+.glass-frame {
   background:
     linear-gradient(150deg, var(--glass-rim) 0%, transparent 32%),
     radial-gradient(120% 80% at 28% 12%, var(--glass-gloss) 0%, transparent 46%);
@@ -366,7 +372,17 @@ body {
   border-radius: inherit;
   box-shadow:
     inset 0 1px 1px var(--glass-specular),
-    inset 0 -34px 60px var(--glass-inner-shadow);
+    inset 0 var(--glass-depth-y, -34px) var(--glass-depth-blur, 60px)
+    var(--glass-inner-shadow);
+}
+
+/* the hero vessel's glass layer: positioning + its lit-state transition only;
+   the frame recipe comes from .glass-frame, applied alongside it in the markup. */
+.vessel__glass {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
   transition: border-color 0.5s ease;
 }
 

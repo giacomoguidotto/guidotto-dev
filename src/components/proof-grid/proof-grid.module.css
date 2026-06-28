@@ -7,9 +7,12 @@
    --stage-*, the warm --ivory, and the earned-color --accent / --live-accent); it
    never edits them.
 
-   The glass framing here replicates GlassVessel's layers (rim light, gloss
-   sweep, specular, inner shadow) rather than composing it, because a proof card
-   must be a navigating <a href={repoUrl}>, not GlassVessel's <button>. A card's
+   The glass framing here is the shared .glass-frame source (rim light, gloss
+   sweep, specular, inner shadow), applied as a global class in the markup
+   alongside this module's .glass — one recipe, no per-surface copy. A proof card
+   is a navigating <a href={repoUrl}>, not GlassVessel's <button>, so it wears the
+   shared frame on its own element rather than reusing GlassVessel's markup. A
+   card's
    loud state (glass, gloss, media sharpen, reveal) is driven by [data-active],
    set by the single-active-card coordinator in ProofGrid, NOT by each card's own
    :hover / :focus-visible. That is what guarantees only one card is ever loud:
@@ -238,21 +241,15 @@
   opacity: 0.85;
 }
 
-/* the glass: rim light, top gloss, specular, inner shadow (token-driven) —
-   a frame, never a lens that distorts the work beneath it */
+/* the glass: the shared .glass-frame (rim light, top gloss, specular, inner
+   shadow) — a frame, never a lens that distorts the work beneath it. .glass-frame
+   is applied alongside this class in the markup; default depth (the vessel
+   -34px/60px) matches the hero, so no depth override here. */
 .glass {
   position: absolute;
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  background:
-    linear-gradient(150deg, var(--glass-rim) 0%, transparent 32%),
-    radial-gradient(120% 80% at 28% 12%, var(--glass-gloss) 0%, transparent 46%);
-  border: 1px solid var(--glass-border);
-  border-radius: inherit;
-  box-shadow:
-    inset 0 1px 1px var(--glass-specular),
-    inset 0 -34px 60px var(--glass-inner-shadow);
   transition:
     border-color 0.5s ease,
     box-shadow 0.5s ease;

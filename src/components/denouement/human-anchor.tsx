@@ -93,7 +93,7 @@ export function HumanAnchor({
             <path d="M 14 125 C 14 96 30 82 50 82 C 70 82 86 96 86 125 Z" />
           </svg>
         )}
-        <span className={styles.portraitGlass} />
+        <span className={`${styles.portraitGlass} glass-frame`} />
       </div>
 
       <div className={styles.humanText}>

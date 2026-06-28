@@ -197,7 +197,7 @@ export function ProofCard({
             <ProjectMedia motif={project.motif} />
           </span>
           <span className={styles.bloom} />
-          <span className={styles.glass} />
+          <span className={`${styles.glass} glass-frame`} />
           <span className={styles.sweep} />
         </span>
       </span>

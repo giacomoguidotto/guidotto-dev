@@ -116,7 +116,7 @@ export function ProjectTile({
             <ProjectMedia motif={model.motif} priority={priority} />
           </span>
           <span className={proofStyles.bloom} />
-          <span className={proofStyles.glass} />
+          <span className={`${proofStyles.glass} glass-frame`} />
           <span className={proofStyles.sweep} />
         </span>
         {/* the hero's floating name tag, restored at rest: it fades in under a

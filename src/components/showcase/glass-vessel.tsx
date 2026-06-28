@@ -179,7 +179,7 @@ export function GlassVessel({
     >
       <span className="vessel__surface" ref={surfaceRef}>
         <ProjectMedia motif={subject.motif} priority={priority} />
-        <span className="vessel__glass" />
+        <span className="vessel__glass glass-frame" />
         <span className="vessel__sweep" ref={sweepRef} />
       </span>
       <span className="vessel__tag">{subject.label}</span>

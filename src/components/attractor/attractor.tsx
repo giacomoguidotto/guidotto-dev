@@ -78,7 +78,7 @@ export function Attractor() {
             rel="noreferrer"
           >
             <ProjectMedia motif={showpiece.motif} />
-            <span className={styles.vesselGlass} />
+            <span className={`${styles.vesselGlass} glass-frame`} />
           </a>
           <span className={styles.landingTag}>{showpiece.label}</span>
         </div>
