@@ -971,19 +971,45 @@ export function Stage() {
   // mismatch); the effect upgrades to a morph only where it is welcome.
   const [mode, setMode] = useState<Mode>("plain");
 
+  // The PORTRAIT morph is a scroll-time reward, so it is deferred until the visitor
+  // signals intent to scroll (first wheel / touch-drag / scroll / keyboard scroll).
+  // Until then a phone keeps the server-rendered PlainStage hero, which is the painted
+  // LCP element. Swapping to the morph tree right after hydration tore that hero down
+  // and re-pinned the mobile LCP to the post-swap render seconds later (TBT was already
+  // ~0, so this remount — not CPU — was the LCP/Speed-Index ceiling). A tap that lights
+  // a hero vessel is NOT scroll intent (touchstart/pointerdown are excluded), so the
+  // vitrine stays interactive at rest without arming the morph. Desktop has the headroom
+  // to morph immediately, so it is never gated.
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    const arm = () => setArmed(true);
+    const opts: AddEventListenerOptions = { once: true, passive: true };
+    // touchmove (not touchstart) and scroll distinguish a scroll from a tap.
+    const intents = ["scroll", "wheel", "touchmove", "keydown"] as const;
+    for (const ev of intents) {
+      window.addEventListener(ev, arm, opts);
+    }
+    return () => {
+      for (const ev of intents) {
+        window.removeEventListener(ev, arm);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const desktop = window.matchMedia(MOTION_QUERY);
     const mobile = window.matchMedia(MOBILE_MOTION_QUERY);
     // The desktop morph wins where both could nominally apply (its 48rem floor and
     // the mobile 40rem ceiling never overlap, but evaluating it first keeps the
     // precedence explicit). Anything matching neither — reduced-motion, no-JS, or a
-    // 40-48rem fine pointer — stays plain. Re-evaluated on resize / orientation /
-    // pointer / reduced-motion change, so a window that crosses a boundary swaps
-    // cleanly instead of latching on the first match.
+    // 40-48rem fine pointer — stays plain. The mobile morph also waits for `armed`
+    // (scroll intent). Re-evaluated on resize / orientation / pointer / reduced-motion
+    // change, so a window that crosses a boundary swaps cleanly instead of latching.
     const sync = () => {
       if (desktop.matches) {
         setMode("motion");
-      } else if (mobile.matches) {
+      } else if (mobile.matches && armed) {
         setMode("mobile");
       } else {
         setMode("plain");
@@ -996,7 +1022,7 @@ export function Stage() {
       desktop.removeEventListener("change", sync);
       mobile.removeEventListener("change", sync);
     };
-  }, []);
+  }, [armed]);
 
   if (mode === "motion") {
     return <MotionStage />;
