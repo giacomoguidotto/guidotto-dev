@@ -4,15 +4,20 @@
 // card once landed (the "same DOM element in both states" the scroll handoff calls
 // for, realised literally). It is a single <a>:
 //
-//   - at rest it is a calm, hover-reactive contact-sheet vessel (no href, so it
-//     never navigates) that matches the hero vessel 1:1 — same depth blur, same
-//     1.4rem corner, same earn-colour-on-hover. The stage drives this through the
-//     tile's data-phase ("rest");
-//   - mid-flight (data-phase "flight") it is inert: pointer events off, no href, so
-//     a half-formed card can't be clicked or lit;
-//   - once the morph resolves (data-phase "live") the stage sets `href` and the
-//     tile behaves exactly like a ProofCard: the whole card navigates to the repo,
-//     hover/focus light it, and the caption's bigger-picture copy reveals.
+//   - the real `href` is ALWAYS present so search crawlers can follow every tile to
+//     its repo from first paint (the morph stage replaces the crawlable PlainStage,
+//     so the tiles themselves have to carry the link — see #SEO crawlable-anchors).
+//     Navigation for HUMANS is gated by the tile's data-phase, not by the href:
+//   - at rest it is a calm, hover-reactive contact-sheet vessel (data-phase "rest")
+//     that matches the hero vessel 1:1 — same depth blur, same 1.4rem corner, same
+//     earn-colour-on-hover. The stage's click guard swallows a click here, and the
+//     tile sits out of the tab order (tabindex -1), so it never navigates;
+//   - mid-flight (data-phase "flight") it is inert: pointer events off, out of the
+//     tab order, click-guarded, so a half-formed card can't be navigated or lit;
+//   - once the morph resolves (data-phase "live") the stage drops the tabindex and
+//     the click guard stands down, so the tile behaves exactly like a ProofCard: the
+//     whole card navigates to the repo, hover/focus light it, and the caption's
+//     bigger-picture copy reveals.
 //
 // It reuses the proof grid's own CSS module for every card layer (poster, glass,
 // bloom, sweep, caption) so the resolved 2x2 is pixel-identical to the standalone
@@ -91,18 +96,19 @@ export function ProjectTile({
   priority?: boolean;
 }) {
   return (
-    // No href here on purpose: the stage adds it (and turns navigation on) only
-    // once the card has resolved. At rest this is a hover-reactive but
-    // non-navigating display vessel; its accessible name, once it is a link, comes
-    // from its visible caption text.
-    // biome-ignore lint/a11y/useValidAnchor: href + interactivity are added by the stage at the resolve threshold (dynamic, single-node handoff).
+    // The href is always present so crawlers can follow the tile to its repo; the
+    // stage arms navigation for humans only once the card resolves (data-phase
+    // "live") — until then it is out of the tab order (tabindex -1) and the stage's
+    // click guard swallows clicks. Its accessible name, once it is an armed link,
+    // comes from its visible caption text.
     <a
       className={`${proofStyles.card} ${styles.tile}`}
       data-active={active ? "true" : undefined}
-      data-href={model.repoUrl}
       data-key={model.key}
+      href={model.repoUrl}
       rel="noreferrer"
       style={{ "--accent": model.accent } as CSSProperties}
+      tabIndex={-1}
     >
       <span className={proofStyles.vessel} data-poster>
         <span className={proofStyles.surface}>

@@ -314,7 +314,6 @@ interface Rig {
   readonly pf: number;
   // The poster (data-poster) wears the depth blur + corner; both scale-compensated.
   readonly poster: HTMLElement;
-  readonly repoUrl: string;
   readonly showpiece: boolean;
   // Viewport-space source/target offsets from the tile's home box, and the FLIP scale.
   readonly srcDx: number;
@@ -429,7 +428,6 @@ const buildPeerRig = (
     el,
     pf: DEPTH_PF[place.depth],
     poster,
-    repoUrl: el.dataset.href ?? "",
     showpiece: false,
     srcDx: vCx - homeCx,
     srcDy: vCy - homeCy,
@@ -508,7 +506,6 @@ const buildShowRig = (
     el,
     pf: DEPTH_PF[place.depth],
     poster,
-    repoUrl: "",
     showpiece: true,
     srcDx: 0,
     srcDy: 0,
@@ -590,7 +587,6 @@ const buildMobilePeerRig = (
     el,
     pf: DEPTH_PF[place.depth],
     poster,
-    repoUrl: el.dataset.href ?? "",
     showpiece: false,
     srcDx: vCx - homeCx,
     srcDy: vCy - homeCy,
@@ -654,11 +650,10 @@ const buildCarouselRig = (
   if (place) {
     return buildMobilePeerRig(el, place, pinRect, carouselTop, vw);
   }
+  // A static flow card is navigable from the start: its href is already on the node
+  // (React render), so we only flip it live and arm the tab order.
   el.dataset.phase = "live";
-  const href = el.dataset.href;
-  if (href) {
-    el.setAttribute("href", href);
-  }
+  el.removeAttribute("tabindex");
   return null;
 };
 
@@ -790,12 +785,16 @@ const phaseFor = (p: number, showpiece: boolean): Phase => {
   return "flight";
 };
 
+// The href is always on the tile (crawlable from first paint); the phase only ARMS
+// navigation for humans. Live joins the tab order and lets the click through; off
+// live the tile keeps its href (crawlers still follow it) but sits out of the tab
+// order, and the stage's click guard swallows the navigation.
 const setPhase = (rig: Rig, phase: Phase) => {
   rig.el.dataset.phase = phase;
   if (phase === "live") {
-    rig.el.setAttribute("href", rig.repoUrl);
+    rig.el.removeAttribute("tabindex");
   } else {
-    rig.el.removeAttribute("href");
+    rig.el.setAttribute("tabindex", "-1");
   }
 };
 
@@ -874,7 +873,7 @@ const restoreRig = (rig: Rig) => {
   s.height = "";
   s.left = "";
   s.top = "";
-  rig.el.removeAttribute("href");
+  rig.el.removeAttribute("tabindex");
   rig.el.removeAttribute("data-phase");
   rig.el.removeAttribute("data-active");
   rig.poster.style.filter = "";
@@ -1292,7 +1291,8 @@ function MobileMotionStage() {
     // per-frame transform / opacity / filter so the proof card's OWN mobile recede +
     // [data-active] bloom (and its 0.45s settle) govern it again — identical to the
     // static cards and the standalone grid (see stage.module.css `.released`). Its
-    // data-phase ("live"), href (navigability), and lit flag are preserved.
+    // data-phase ("live"), tab order, and lit flag are preserved (the href has been
+    // on the node since first paint).
     const releaseToCarousel = (rig: Rig) => {
       const s = rig.el.style;
       s.transform = "";
@@ -1460,6 +1460,17 @@ function MobileMotionStage() {
         light(el);
       }
     };
+    // Crawlable but inert until live: every tile carries its href from first paint
+    // (so search crawlers can follow it to the repo), but only a live tile may
+    // navigate. The static flow cards (Scry / Ginevra) are live from the start; a
+    // rigged peer and the showpiece swallow the tap until the release seam makes
+    // them live, so a mid-morph card never navigates.
+    const onNavGuard = (event: MouseEvent) => {
+      const el = tileFrom(event.target);
+      if (el && el.dataset.phase !== "live") {
+        event.preventDefault();
+      }
+    };
     // Touch dismissal: a tap outside every tile releases the lit one (a tap on a tile is
     // handled by onClick and must not also dismiss).
     const onDocPointerDown = (event: PointerEvent) => {
@@ -1513,6 +1524,7 @@ function MobileMotionStage() {
     stage.addEventListener("focusin", onFocusIn);
     stage.addEventListener("focusout", onFocusOut);
     stage.addEventListener("click", onClick);
+    stage.addEventListener("click", onNavGuard);
     document.addEventListener("pointerdown", onDocPointerDown);
 
     // Restore the hero's field parallax for the rest contact sheet: a phone (coarse)
@@ -1555,6 +1567,7 @@ function MobileMotionStage() {
       stage.removeEventListener("focusin", onFocusIn);
       stage.removeEventListener("focusout", onFocusOut);
       stage.removeEventListener("click", onClick);
+      stage.removeEventListener("click", onNavGuard);
       document.removeEventListener("pointerdown", onDocPointerDown);
       coarseMql.removeEventListener("change", onCoarseChange);
       field.stop();
@@ -1866,16 +1879,28 @@ function MotionStage() {
       focusedEl = null;
     };
 
+    // Crawlable but inert until live: every tile carries its href from first paint
+    // (so search crawlers can follow it to the repo), but only a live tile may
+    // navigate. Off live — the at-rest contact sheet and every mid-flight frame —
+    // swallow the click so a display vessel never navigates. Keyboard is gated in
+    // parallel by the tile's tabindex, which setPhase drops only at the live phase.
+    const onNavGuard = (event: MouseEvent) => {
+      const el = tileFrom(event.target);
+      if (el && el.dataset.phase !== "live") {
+        event.preventDefault();
+      }
+    };
+
     // --- Keyboard entry into the contact sheet -----------------------------
-    // In motion mode the work tiles are not focusable until the morph resolves
-    // (they gain their href only past RESOLVE_AT), and the masthead is the only
-    // focusable before the stage — so a forward Tab from it would skip the whole
-    // showcase. We intercept that single Tab: drive the handoff to its resolved
-    // snap, then move focus onto the first landed work, so the keyboard walks the
-    // same narrative the scroll tells. Everything after stays native — once the
-    // tiles are live anchors the browser's own scroll-into-view drives the morph,
-    // and Shift+Tab steps back to the masthead on its own. This couples to the
-    // masthead link's global `.masthead__home` class (the page's first focusable).
+    // In motion mode the work tiles are not in the tab order until the morph
+    // resolves (they carry tabindex="-1" until they go live past RESOLVE_AT), and
+    // the masthead is the only focusable before the stage — so a forward Tab from it
+    // would skip the whole showcase. We intercept that single Tab: drive the handoff
+    // to its resolved snap, then move focus onto the first landed work, so the
+    // keyboard walks the same narrative the scroll tells. Everything after stays
+    // native — once the tiles are live anchors the browser's own scroll-into-view
+    // drives the morph, and Shift+Tab steps back to the masthead on its own. This
+    // couples to the masthead link's global `.masthead__home` class (first focusable).
     let landRaf = 0;
     const onEntryTab = (event: KeyboardEvent) => {
       if (event.key !== "Tab" || event.shiftKey || event.defaultPrevented) {
@@ -1899,7 +1924,7 @@ function MotionStage() {
       // in-flight smooth scroll.
       const deadline = performance.now() + 1500;
       const land = () => {
-        if (firstTile.hasAttribute("href")) {
+        if (firstTile.dataset.phase === "live") {
           firstTile.focus({ preventScroll: true });
           return;
         }
@@ -1971,6 +1996,7 @@ function MotionStage() {
     stage.addEventListener("pointerleave", onLeave);
     stage.addEventListener("focusin", onFocusIn);
     stage.addEventListener("focusout", onFocusOut);
+    stage.addEventListener("click", onNavGuard);
     // Bound on the document, not the stage: the masthead link it watches lives
     // outside the stage subtree.
     document.addEventListener("keydown", onEntryTab);
@@ -2000,6 +2026,7 @@ function MotionStage() {
       stage.removeEventListener("pointerleave", onLeave);
       stage.removeEventListener("focusin", onFocusIn);
       stage.removeEventListener("focusout", onFocusOut);
+      stage.removeEventListener("click", onNavGuard);
       document.removeEventListener("keydown", onEntryTab);
       field.stop();
       observer.disconnect();
