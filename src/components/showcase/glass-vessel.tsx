@@ -90,6 +90,7 @@ export function GlassVessel({
   depth,
   active = false,
   interaction = "hover",
+  priority = false,
   onActivate,
   onDeactivate,
 }: {
@@ -101,6 +102,8 @@ export function GlassVessel({
   active?: boolean;
   /** Lighting trigger: hover/focus, or an explicit tap (default hover). */
   interaction?: VesselInteraction;
+  /** Eager-load + preload this vessel's logo (it is an above-the-fold LCP card). */
+  priority?: boolean;
   /** Activation intent (hover-enter / focus, or tap), reported with this key. */
   onActivate?: (key: string) => void;
   /** Release intent (hover-leave / blur); unused in tap mode. */
@@ -169,7 +172,7 @@ export function GlassVessel({
       type="button"
     >
       <span className="vessel__surface" ref={surfaceRef}>
-        <ProjectMedia motif={subject.motif} />
+        <ProjectMedia motif={subject.motif} priority={priority} />
         <span className="vessel__glass" />
         <span className="vessel__sweep" ref={sweepRef} />
       </span>

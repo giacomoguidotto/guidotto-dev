@@ -1575,7 +1575,7 @@ function MobileMotionStage() {
             carousel; it sets itself aside off-screen, aimed at the finale's landing
             slot when the attractor is present below (else straight down) */}
         <div className={styles.vitrine} ref={vitrineRef}>
-          <ProjectTile model={SHOWPIECE_MODEL} />
+          <ProjectTile model={SHOWPIECE_MODEL} priority />
         </div>
 
         <div className={styles.vignette} ref={vignetteRef} />
@@ -2018,7 +2018,7 @@ function MotionStage() {
             it sets itself aside off-screen, aimed at the finale's landing slot when
             the attractor is present below the grid (else straight down) */}
         <div className={styles.vitrine} ref={vitrineRef}>
-          <ProjectTile model={SHOWPIECE_MODEL} />
+          <ProjectTile model={SHOWPIECE_MODEL} priority />
         </div>
 
         <div className={styles.vignette} ref={vignetteRef} />

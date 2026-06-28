@@ -72,6 +72,7 @@ function TileCaption({ model }: { model: TileModel }) {
 export function ProjectTile({
   model,
   active,
+  priority = false,
 }: {
   model: TileModel;
   /**
@@ -81,6 +82,13 @@ export function ProjectTile({
    * attribute and never fights that imperative write.
    */
   active?: boolean;
+  /**
+   * Eager-load this tile's logo. The stages set it on the showpiece (the top
+   * portrait card) so the mobile LCP element paints the instant the post-hydration
+   * morph tree mounts, instead of waiting for a lazy fetch. The hero already
+   * preloads the same optimized URL, so this only flips the swapped-in node eager.
+   */
+  priority?: boolean;
 }) {
   return (
     // No href here on purpose: the stage adds it (and turns navigation on) only
@@ -99,7 +107,7 @@ export function ProjectTile({
       <span className={proofStyles.vessel} data-poster>
         <span className={proofStyles.surface}>
           <span className={proofStyles.media}>
-            <ProjectMedia motif={model.motif} />
+            <ProjectMedia motif={model.motif} priority={priority} />
           </span>
           <span className={proofStyles.bloom} />
           <span className={proofStyles.glass} />

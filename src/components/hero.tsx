@@ -244,6 +244,11 @@ function VitrineStage() {
               interaction={coarse ? "tap" : "hover"}
               onActivate={activate}
               onDeactivate={release}
+              // Preload the cards that flank the thesis on portrait (the ones with a
+              // mobile placement): on a phone one of these is the LCP element, and
+              // left lazy it is only discovered after hydration. The two mobile-hidden
+              // planes stay lazy so a phone never preloads a display:none logo.
+              priority={Boolean(plane.mobile)}
               shape="rect"
               subject={plane.subject}
             />

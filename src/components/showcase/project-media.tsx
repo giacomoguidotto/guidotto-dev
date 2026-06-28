@@ -26,7 +26,20 @@ const LOGOS: Record<Motif, Logo> = {
   gallery: { src: "/work/ginevra/logo.png" },
 };
 
-export function ProjectMedia({ motif }: { motif: Motif }) {
+export function ProjectMedia({
+  motif,
+  priority = false,
+}: {
+  motif: Motif;
+  /**
+   * Eager-load + preload this logo (next/image `priority`). The hero's
+   * above-the-fold vessels set this so the LCP card image is discovered at
+   * HTML-parse time instead of after hydration — otherwise the portrait hero
+   * card (the mobile LCP element) is lazy-loaded and lands seconds late. The
+   * below-the-fold proof grid and attractor leave it false so they stay lazy.
+   */
+  priority?: boolean;
+}) {
   const logo = LOGOS[motif];
   return (
     <span className="vessel__media">
@@ -36,6 +49,7 @@ export function ProjectMedia({ motif }: { motif: Motif }) {
         alt=""
         className="vessel__logo"
         fill
+        priority={priority}
         sizes="(max-width: 40rem) 45vw, 17rem"
         src={logo.src}
       />
