@@ -20,12 +20,34 @@ export type Motif = "neural" | "topology" | "mobile" | "macwindow" | "gallery";
 export interface SiteContent {
   /** Meta description. */
   readonly description: string;
+  /** Degree-granting institution, for `Person.alumniOf`. */
+  readonly education: {
+    readonly name: string;
+    readonly url: string;
+  };
+  /** Current employer, for `Person.worksFor` (JSON-LD entity linking). */
+  readonly employer: {
+    readonly name: string;
+    readonly url: string;
+  };
   /** Person job title (JSON-LD). */
   readonly jobTitle: string;
+  /** Topics of expertise for `Person.knowsAbout`, drawn from the work shown
+   *  on this page (never invented). Broadens topical discovery. */
+  readonly knowsAbout: readonly string[];
+  /** Spoken/written languages, for `Person.knowsLanguage` (name + BCP-47). */
+  readonly languages: readonly {
+    readonly name: string;
+    readonly code: string;
+  }[];
   /** BCP-47 language. */
   readonly locale: string;
   /** Person name (JSON-LD, author). */
   readonly name: string;
+  /** Country of nationality for `Person.nationality` (schema.org Country). */
+  readonly nationality: string;
+  /** Bare ORCID iD, for the `Person.identifier` PropertyValue. */
+  readonly orcid: string;
   /** Verified external identities for `Person.sameAs`. */
   readonly sameAs: readonly string[];
   /** Document `<title>`. */
@@ -175,6 +197,8 @@ export interface Content {
 const GITHUB = "https://github.com/giacomoguidotto";
 const LINKEDIN = "https://www.linkedin.com/in/giacomo-guidotto/";
 const X = "https://x.com/giacomoguidotto";
+const ORCID_ID = "0009-0006-2279-9126";
+const ORCID = `https://orcid.org/${ORCID_ID}`;
 
 export const content: Content = {
   site: {
@@ -186,7 +210,34 @@ export const content: Content = {
       "Software engineer working across backend platforms, native apps, and ML research. Chasing ideas to make an impact, and shipping them.",
     url: "https://guidotto.dev",
     locale: "en",
-    sameAs: [GITHUB, LINKEDIN, X],
+    nationality: "Italy",
+    orcid: ORCID_ID,
+    sameAs: [GITHUB, LINKEDIN, X, ORCID],
+    employer: {
+      name: "Danfoss",
+      url: "https://www.danfoss.com",
+    },
+    education: {
+      name: "Ca' Foscari University of Venice",
+      url: "https://www.unive.it",
+    },
+    languages: [
+      { name: "Italian", code: "it" },
+      { name: "English", code: "en" },
+    ],
+    // Sourced only from the work shown on this page (mission + projects).
+    knowsAbout: [
+      "Physics-informed neural networks",
+      "Machine learning",
+      "Backend engineering",
+      "Native application development",
+      "Distributed systems",
+      "Rust",
+      "Go",
+      "Kubernetes",
+      "MQTT",
+      "IoT platforms",
+    ],
   },
 
   hero: {
