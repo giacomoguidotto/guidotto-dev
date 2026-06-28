@@ -427,6 +427,11 @@
   box-shadow: 0 18px 40px -22px oklch(0 0 0 / 0.85);
 }
 
+.vessel:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--accent) 70%, var(--ivory));
+  outline-offset: 4px;
+}
+
 /* the glass frame over the small vessel: rim light, gloss, specular, inner shadow
    (token-driven) — the same CSS-faked glass the contact-sheet vessels wear. */
 .vesselGlass {

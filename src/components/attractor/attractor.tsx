@@ -57,22 +57,33 @@ export function Attractor() {
 
       {/* The instrument's stage. The live scene + the HUD knobs / scrubber mount
           inside `LiveInstrument`; the parked vessel and the badge are static
-          chrome layered over it. */}
+          chrome layered over it. The vessel is authored BEFORE the instrument so
+          the keyboard reaches the repo link before the scrubber (matching its
+          visual top-left position); both are absolutely placed at z-index 2, so
+          source order changes the tab sequence without touching the layout. */}
       <div className={styles.instrument}>
-        <LiveInstrument />
-
         {/* The landed fifth vessel: AnyPINN, small, top-left — the seam the Stage
             set-aside aims at. Poster-only, like the contact-sheet vessel. The
             [data-finale-landing] hook sits on the vessel's media box itself (not
             the column that also holds the tag), so the Stage shrinks the departing
-            vessel to exactly the box it lands in, even if this layout shifts. */}
+            vessel to exactly the box it lands in, even if this layout shifts. The
+            box is itself the live repo link — the one focusable affordance of the
+            centerpiece, matching the proof cards' verbatim name + repo target. */}
         <div className={styles.landing}>
-          <span className={styles.vessel} data-finale-landing>
+          <a
+            aria-label={showpiece.label}
+            className={styles.vessel}
+            data-finale-landing
+            href={showpiece.repoUrl}
+            rel="noreferrer"
+          >
             <ProjectMedia motif={showpiece.motif} />
             <span className={styles.vesselGlass} />
-          </span>
+          </a>
           <span className={styles.landingTag}>{showpiece.label}</span>
         </div>
+
+        <LiveInstrument />
 
         {/* The one live badge (never "peer-reviewed"). */}
         <span className={styles.badge}>{showpiece.badge}</span>
