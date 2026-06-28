@@ -63,6 +63,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Hero } from "~/components/hero";
 import { ProofGrid } from "~/components/proof-grid/proof-grid";
 import proofStyles from "~/components/proof-grid/proof-grid.module.css";
+import { startGyroTilt } from "~/components/showcase/gyro-tilt";
 import { ShowcaseRoot } from "~/components/showcase/showcase-root";
 import { content, type Project } from "~/content";
 import { ProjectTile, type TileModel } from "./project-tile";
@@ -174,6 +175,14 @@ const VITRINE: Record<string, VitrinePlacement> = {
 const DEPTH_BLUR: Record<1 | 2 | 3, number> = { 1: 1.5, 2: 4, 3: 8 };
 const DEPTH_OPACITY: Record<1 | 2 | 3, number> = { 1: 0.9, 2: 0.74, 3: 0.52 };
 const DEPTH_SCALE: Record<1 | 2 | 3, number> = { 1: 1, 2: 0.97, 3: 0.92 };
+
+// Depth -> the hero's own per-depth PARALLAX FACTOR (px): the same `--pf` the hero's
+// .vessel reads (globals.css), so the rest contact sheet sways with the pointer / gyro
+// exactly like the standalone hero — near vessels (depth 1) travel more than far ones
+// (depth 3). `drive()` multiplies the field offset by this and fades it out as the
+// morph leaves rest, so the sway is a rest-only echo of the hero and never fights the
+// FLIP flight.
+const DEPTH_PF: Record<1 | 2 | 3, number> = { 1: 26, 2: 16, 3: 8 };
 
 // ---- the handoff choreography (the "dance") ----
 //
@@ -298,6 +307,10 @@ interface Rig {
   readonly depthBlur: number;
   readonly depthOpacity: number;
   readonly el: HTMLElement;
+  // The hero's per-depth field-parallax factor (px): `drive()` multiplies the live
+  // pointer / gyro offset by this (faded out as the morph leaves rest) so the rest
+  // contact sheet sways exactly like the standalone hero's .vessel.
+  readonly pf: number;
   // The poster (data-poster) wears the depth blur + corner; both scale-compensated.
   readonly poster: HTMLElement;
   readonly repoUrl: string;
@@ -413,6 +426,7 @@ const buildPeerRig = (
     depthBlur: DEPTH_BLUR[place.depth],
     depthOpacity: DEPTH_OPACITY[place.depth],
     el,
+    pf: DEPTH_PF[place.depth],
     poster,
     repoUrl: el.dataset.href ?? "",
     showpiece: false,
@@ -491,6 +505,7 @@ const buildShowRig = (
     depthBlur: DEPTH_BLUR[place.depth],
     depthOpacity: DEPTH_OPACITY[place.depth],
     el,
+    pf: DEPTH_PF[place.depth],
     poster,
     repoUrl: "",
     showpiece: true,
@@ -569,6 +584,7 @@ const buildMobilePeerRig = (
     depthBlur: DEPTH_BLUR[place.depth],
     depthOpacity: DEPTH_OPACITY[place.depth],
     el,
+    pf: DEPTH_PF[place.depth],
     poster,
     repoUrl: el.dataset.href ?? "",
     showpiece: false,
@@ -722,11 +738,20 @@ const danceDelta = (rig: Rig, m: number): { x: number; y: number } => {
 // On top of that straight base each vessel rides a `danceDelta` excursion — a bow or a
 // pirouette that returns to exactly the target — so the handoff arrives composed but
 // gets there by dancing (see the DANCE block).
-const drive = (rig: Rig, p: number, lit: boolean) => {
+//
+// `fx` / `fy` are the live field-parallax offset (the pointer position on desktop, the
+// gyro tilt on a phone; normalised like the hero's `--mx` / `--my`). They are folded in
+// the SAME way the hero's .vessel reads them — multiplied by this vessel's depth factor
+// (`rig.pf`) — but tapered by `(1 - m)` so the sway is a REST-ONLY echo of the hero: it
+// is at full reach in the contact sheet and gone by the time the tiles take flight, so
+// it never fights the FLIP. They default to 0, so a caller that does not drive the field
+// (the initial measure, a released card) gets the exact prior, parallax-free transform.
+const drive = (rig: Rig, p: number, lit: boolean, fx = 0, fy = 0) => {
   const m = smoothstep(0, MORPH_LANDING, p);
   const delta = danceDelta(rig, m);
-  const dx = lerp(rig.srcDx, rig.tgtDx, m) + delta.x;
-  const dy = lerp(rig.srcDy, rig.tgtDy, m) + delta.y;
+  const rest = 1 - m;
+  const dx = lerp(rig.srcDx, rig.tgtDx, m) + delta.x + fx * rig.pf * rest;
+  const dy = lerp(rig.srcDy, rig.tgtDy, m) + delta.y + fy * rig.pf * rest;
   const base = lerp(rig.srcScale, rig.tgtScale, m);
   const scale = lit ? base * HOVER_SCALE : base;
   rig.el.style.transform = `translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;
@@ -858,6 +883,83 @@ const restoreRig = (rig: Rig) => {
   if (rig.caption) {
     rig.caption.style.opacity = "";
   }
+};
+
+// The hero's field-parallax input, restored for a morph stage's REST contact sheet.
+// The morph stages replace <Hero> (which owned `--mx` / `--my`) with their own tiles,
+// so without this the rest sheet sits static — no mouse parallax on desktop, no gyro
+// sway on a phone. This is the same one physics, wired to the same two channels:
+//   - a FINE pointer tracks the cursor against the pin (the viewport-sized contact
+//     sheet), normalised to ±0.5 per axis exactly like the hero;
+//   - a COARSE pointer has no mouse, so device tilt drives the same offset (reusing the
+//     hero's `startGyroTilt`: a subtle, smoothed, clamped sway, with the iOS permission
+//     piggyback surfaced through `enable()` for the stage's first tap-to-light).
+// Offsets are rAF-coalesced and handed to `onField`; the caller folds them into `drive()`
+// (tapered to zero as the morph leaves rest). The input choice is a mount-time snapshot,
+// like ShowcaseRoot. Reduced motion never reaches here — both morph stages are gated
+// behind `no-preference` — so the field is always welcome once this runs.
+interface FieldInput {
+  /** iOS gyro permission piggyback; a no-op on the pointer path / non-iOS. */
+  readonly enable: () => void;
+  /** Remove every listener + cancel the pending frame (called on unmount). */
+  readonly stop: () => void;
+}
+
+const startFieldInput = (
+  pin: HTMLElement,
+  onField: (fx: number, fy: number) => void
+): FieldInput => {
+  let raf = 0;
+  let fx = 0;
+  let fy = 0;
+  const flush = () => {
+    if (raf !== 0) {
+      return;
+    }
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      onField(fx, fy);
+    });
+  };
+  const cancel = () => {
+    if (raf !== 0) {
+      cancelAnimationFrame(raf);
+    }
+  };
+
+  // No mouse to track: device tilt drives the same field instead (Android starts
+  // silently; iOS waits for the stage's tap to call `enable()`).
+  if (window.matchMedia("(pointer: coarse)").matches) {
+    const gyro = startGyroTilt((mx, my) => {
+      fx = mx;
+      fy = my;
+      flush();
+    });
+    return {
+      enable: () => gyro.enable(),
+      stop: () => {
+        gyro.stop();
+        cancel();
+      },
+    };
+  }
+
+  const onMove = (event: PointerEvent) => {
+    const rect = pin.getBoundingClientRect();
+    fx = (event.clientX - rect.left) / rect.width - 0.5;
+    fy = (event.clientY - rect.top) / rect.height - 0.5;
+    flush();
+  };
+  window.addEventListener("pointermove", onMove, { passive: true });
+  return {
+    enable: () => {
+      // The pointer path has no gesture gate to satisfy.
+    },
+    stop: () => {
+      window.removeEventListener("pointermove", onMove);
+      cancel();
+    },
+  };
 };
 
 export function Stage() {
@@ -1061,6 +1163,11 @@ function MobileMotionStage() {
     let lastProgress = -1;
     let activeEl: HTMLElement | null = null;
     let focusedEl: HTMLElement | null = null;
+    // The live field-parallax offset (the hero's `--mx` / `--my`): device tilt on a
+    // phone, the pointer on a narrow fine-pointer window. `drive()` folds it in, faded
+    // to zero off rest.
+    let fieldX = 0;
+    let fieldY = 0;
     // The key the #27 observer last SETTLED at centre, so the snap haptic fires once
     // per NEW centre (not on every observer tick), and so the release seam can seed it
     // (it lights Orray, so the observer's first Orray tick is a no-op, not a re-buzz).
@@ -1106,7 +1213,7 @@ function MobileMotionStage() {
     const redrive = (el: HTMLElement | null, lit: boolean) => {
       const rig = el ? rigByEl.get(el) : undefined;
       if (rig) {
-        drive(rig, lastProgress, lit);
+        drive(rig, lastProgress, lit, fieldX, fieldY);
       }
     };
     const light = (el: HTMLElement | null) => {
@@ -1119,6 +1226,20 @@ function MobileMotionStage() {
         redrive(prev, false);
       }
       redrive(el, true);
+    };
+
+    // The tilt / pointer moved: re-drive the rest contact sheet so it sways under the
+    // new offset. Only at rest — off rest the scroll's `apply()` owns the tiles and the
+    // `(1 - m)` taper has already faded the sway.
+    const onField = (fx: number, fy: number) => {
+      fieldX = fx;
+      fieldY = fy;
+      if (phase !== "rest") {
+        return;
+      }
+      for (const rig of rigs) {
+        drive(rig, lastProgress, rig.el === activeEl, fieldX, fieldY);
+      }
     };
 
     // The carousel card whose poster centre sits nearest the viewport's vertical middle
@@ -1224,7 +1345,13 @@ function MobileMotionStage() {
           releaseToCarousel(rig);
           setPhase(rig, "live");
         } else {
-          drive(rig, p, phase === "rest" && rig.el === activeEl);
+          drive(
+            rig,
+            p,
+            phase === "rest" && rig.el === activeEl,
+            fieldX,
+            fieldY
+          );
           setPhase(rig, morphPhase(rig, p));
         }
       }
@@ -1307,12 +1434,16 @@ function MobileMotionStage() {
     };
     // Coarse-pointer tap: light a tile and KEEP it lit (re-tap replays its lift, never
     // toggles off). A tap that resolves nothing is left to the outside-dismiss below.
+    // The tap doubles as the iOS gyro permission piggyback (like the hero): the first
+    // tap that lights a vessel also asks for DeviceOrientation access, so the gyro field
+    // parallax can take over. `enable()` is idempotent and a no-op once granted/denied.
     const onClick = (event: MouseEvent) => {
       if (!coarse) {
         return;
       }
       const el = tileFrom(event.target);
       if (el && lightable(el)) {
+        field.enable();
         light(el);
       }
     };
@@ -1371,6 +1502,12 @@ function MobileMotionStage() {
     stage.addEventListener("click", onClick);
     document.addEventListener("pointerdown", onDocPointerDown);
 
+    // Restore the hero's field parallax for the rest contact sheet: a phone (coarse)
+    // sways the vessels by device tilt (the iOS permission is piggybacked on the first
+    // tap, in onClick); a narrow fine-pointer window tracks the cursor. Re-drives only
+    // at rest; `drive()` fades it out through the morph.
+    const field = startFieldInput(pin, onField);
+
     // The carousel box (and so the scatter deltas + the Orray-centre lead) can shift
     // after web fonts swap in or any reflow; re-measure so the FLIP stays true.
     const observer = new ResizeObserver(remeasure);
@@ -1407,6 +1544,7 @@ function MobileMotionStage() {
       stage.removeEventListener("click", onClick);
       document.removeEventListener("pointerdown", onDocPointerDown);
       coarseMql.removeEventListener("change", onCoarseChange);
+      field.stop();
       observer.disconnect();
       centerObserver.disconnect();
       if (raf !== 0) {
@@ -1595,6 +1733,10 @@ function MotionStage() {
     let lastProgress = -1;
     let activeEl: HTMLElement | null = null;
     let focusedEl: HTMLElement | null = null;
+    // The live field-parallax offset (the hero's `--mx` / `--my`, here the pointer
+    // position against the pin). `drive()` folds it in, tapered to zero off rest.
+    let fieldX = 0;
+    let fieldY = 0;
 
     const setActive = (el: HTMLElement | null) => {
       if (el === activeEl) {
@@ -1621,7 +1763,7 @@ function MotionStage() {
     const redrive = (el: HTMLElement | null, lit: boolean) => {
       const rig = el ? rigByEl.get(el) : undefined;
       if (rig) {
-        drive(rig, lastProgress, lit);
+        drive(rig, lastProgress, lit, fieldX, fieldY);
       }
     };
     const light = (el: HTMLElement | null) => {
@@ -1636,6 +1778,20 @@ function MotionStage() {
       redrive(el, true);
     };
 
+    // The pointer / gyro moved: re-drive the rest contact sheet so it sways under the
+    // new offset. Only at rest — off rest the scroll's own `apply()` owns the tiles and
+    // the `(1 - m)` taper has already faded the sway, so a mid-flight tick is wasted.
+    const onField = (fx: number, fy: number) => {
+      fieldX = fx;
+      fieldY = fy;
+      if (phase !== "rest") {
+        return;
+      }
+      for (const rig of rigs) {
+        drive(rig, lastProgress, rig.el === activeEl, fieldX, fieldY);
+      }
+    };
+
     const apply = (p: number) => {
       stage.style.setProperty("--p", p.toFixed(4));
       phase = phaseFor(p, false);
@@ -1645,7 +1801,7 @@ function MotionStage() {
       }
       driveChrome(chrome, p, phase);
       for (const rig of rigs) {
-        drive(rig, p, phase === "rest" && rig.el === activeEl);
+        drive(rig, p, phase === "rest" && rig.el === activeEl, fieldX, fieldY);
         setPhase(rig, phaseFor(p, rig.showpiece));
       }
     };
@@ -1805,6 +1961,11 @@ function MotionStage() {
     // Bound on the document, not the stage: the masthead link it watches lives
     // outside the stage subtree.
     document.addEventListener("keydown", onEntryTab);
+    // Restore the hero's field parallax for the rest contact sheet: a fine pointer
+    // (the only kind that reaches the desktop morph) sways the vessels under the cursor
+    // exactly like the standalone hero. Re-drives only at rest; `drive()` fades it out
+    // through the morph.
+    const field = startFieldInput(pin, onField);
     // The grid box (and so the scatter deltas) can shift after web fonts swap in or
     // any reflow; re-measure so the FLIP stays true.
     //
@@ -1827,6 +1988,7 @@ function MotionStage() {
       stage.removeEventListener("focusin", onFocusIn);
       stage.removeEventListener("focusout", onFocusOut);
       document.removeEventListener("keydown", onEntryTab);
+      field.stop();
       observer.disconnect();
       if (raf !== 0) {
         cancelAnimationFrame(raf);
