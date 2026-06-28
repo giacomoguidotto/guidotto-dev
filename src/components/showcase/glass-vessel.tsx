@@ -88,6 +88,7 @@ export function GlassVessel({
   subject,
   shape,
   depth,
+  mobileDepth,
   active = false,
   interaction = "hover",
   priority = false,
@@ -98,6 +99,10 @@ export function GlassVessel({
   shape: VesselShape;
   /** Depth-of-field layer: 1 = near/sharp, 3 = far/blurred. */
   depth: 1 | 2 | 3;
+  /** Portrait depth-of-field layer, when it differs from `depth` (the portrait
+   *  contact sheet re-keys some vessels). Surfaced as `data-mobile-depth` for the
+   *  portrait media query to read; absent means `depth` is reused on portrait too. */
+  mobileDepth?: 1 | 2 | 3;
   /** Whether this is the coordinator's single lit vessel (drives the loud CSS). */
   active?: boolean;
   /** Lighting trigger: hover/focus, or an explicit tap (default hover). */
@@ -163,6 +168,7 @@ export function GlassVessel({
       className={`vessel vessel--${shape}`}
       data-active={active}
       data-depth={depth}
+      data-mobile-depth={mobileDepth}
       onBlur={tap ? undefined : deactivate}
       onClick={tap ? handleTap : undefined}
       onFocus={tap ? undefined : activate}

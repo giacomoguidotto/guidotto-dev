@@ -56,6 +56,11 @@ interface PlaneSpec extends Placement {
   key: string;
   /** Portrait placement (top-left position + width); absent means hidden on mobile. */
   mobile?: Placement;
+  /** Portrait depth-of-field layer, when it differs from the desktop `depth` (the
+   *  portrait morph re-keys some vessels — Orray recedes a layer behind Tempo). Only
+   *  set on planes whose portrait framing mirrors MOBILE_SCATTER; absent means the
+   *  desktop `depth` is reused on portrait too. */
+  mobileDepth?: 1 | 2 | 3;
 }
 
 interface Plane extends Omit<PlaneSpec, "key"> {
@@ -78,10 +83,17 @@ const subjectFor = (key: string): PlaneSubject | undefined =>
 // The fixed sizes are tuned so the clusters stay grouped without piling up; CSS
 // clamps the width down only in the final sliver before the portrait re-author,
 // as an anti-overlap safety. The three planes with a `mobile` placement (the
-// showpiece plus one warm and one cool project, for accent variety) reframe to
-// flank the thesis on portrait; the two without it drop out so the small
-// composition stays legible. Every plane is square (ar 1) because the media is
-// now a square app-icon logo: a non-square vessel would letterbox the tile.
+// showpiece, Orray, Tempo) reframe to flank the thesis on portrait; the other two
+// (Scry, Ginevra) drop out so the small composition stays legible. Those three
+// placements — and their `mobileDepth` overrides — MIRROR the portrait morph's rest
+// contact sheet (stage.tsx -> MOBILE_SCATTER): the SSR/plain hero a phone paints
+// first IS the morph's rest state, so when the client swaps PlainStage for
+// MobileMotionStage there is nothing to jump (same three vessels, same top-left
+// framing, same depth field). Keep the two in sync. `mobileDepth` re-keys the
+// depth-of-field for portrait where it differs from the desktop scatter (Orray
+// recedes a layer behind Tempo — see the MOBILE_SCATTER note). Every plane is square
+// (ar 1) because the media is now a square app-icon logo: a non-square vessel would
+// letterbox the tile.
 const PLANE_SPECS: PlaneSpec[] = [
   {
     key: showpiece.key,
@@ -90,18 +102,20 @@ const PLANE_SPECS: PlaneSpec[] = [
     y: "33%",
     w: "16.5rem",
     ar: "1",
-    mobile: { x: "27%", y: "4%", w: "46vw" },
+    mobile: { x: "27%", y: "5%", w: "46vw" },
+    mobileDepth: 2,
   },
-  { key: "orray", depth: 1, x: "23%", y: "69%", w: "15rem", ar: "1" },
   {
-    key: "scry",
-    depth: 2,
-    x: "74%",
-    y: "27%",
-    w: "16.5rem",
+    key: "orray",
+    depth: 1,
+    x: "23%",
+    y: "69%",
+    w: "15rem",
     ar: "1",
-    mobile: { x: "53%", y: "71%", w: "43vw" },
+    mobile: { x: "5%", y: "64%", w: "45vw" },
+    mobileDepth: 2,
   },
+  { key: "scry", depth: 2, x: "74%", y: "27%", w: "16.5rem", ar: "1" },
   {
     key: "tempo",
     depth: 3,
@@ -109,7 +123,8 @@ const PLANE_SPECS: PlaneSpec[] = [
     y: "67%",
     w: "15rem",
     ar: "1",
-    mobile: { x: "4%", y: "66%", w: "45vw" },
+    mobile: { x: "53%", y: "70%", w: "42vw" },
+    mobileDepth: 1,
   },
   { key: "ginevra", depth: 3, x: "50%", y: "16%", w: "12.5rem", ar: "1" },
 ];
@@ -242,6 +257,7 @@ function VitrineStage() {
               active={coarse && plane.subject.key === activeKey}
               depth={plane.depth}
               interaction={coarse ? "tap" : "hover"}
+              mobileDepth={plane.mobileDepth}
               onActivate={activate}
               onDeactivate={release}
               // Preload the cards that flank the thesis on portrait (the ones with a

@@ -549,6 +549,46 @@ body {
     display: none;
   }
 
+  /* Three planes (the showpiece, Orray, Tempo) carry a `--mob-*` placement AND a
+     `data-mobile-depth`: on portrait they ARE the MobileMotionStage rest contact
+     sheet (stage.tsx -> MOBILE_SCATTER), so the SSR/plain hero a phone paints first
+     and the post-hydration morph share one framing and the swap has nothing to jump.
+     The morph sizes its rest vessels by width alone (no per-depth FLIP scale), so
+     portrait drops `--scale` to 1 to match, and re-keys the depth-of-field blur +
+     recede off the PORTRAIT depth (Orray recedes a layer behind Tempo). The values
+     mirror the `[data-depth]` table above; the `:not(...)` guard keeps a tapped /
+     focused vessel blooming sharp exactly as on the web (it would otherwise outrank
+     the lit-state rules, which sit earlier in the source). */
+  .vessel[data-mobile-depth]:not(:hover):not(:focus-visible):not(
+    [data-active="true"]
+  ) {
+    --scale: 1;
+  }
+
+  .vessel[data-mobile-depth="3"]:not(:hover):not(:focus-visible):not(
+    [data-active="true"]
+  ) {
+    --pf: 8px;
+    opacity: 0.52;
+    filter: blur(8px);
+  }
+
+  .vessel[data-mobile-depth="2"]:not(:hover):not(:focus-visible):not(
+    [data-active="true"]
+  ) {
+    --pf: 16px;
+    opacity: 0.74;
+    filter: blur(4px);
+  }
+
+  .vessel[data-mobile-depth="1"]:not(:hover):not(:focus-visible):not(
+    [data-active="true"]
+  ) {
+    --pf: 26px;
+    opacity: 0.9;
+    filter: blur(1.5px);
+  }
+
   .vitrine__copy {
     gap: 0.9rem;
     width: 90vw;
