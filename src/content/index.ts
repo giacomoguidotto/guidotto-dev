@@ -284,7 +284,7 @@ export const content: Content = {
   notFound: {
     eyebrow: "ERROR 404",
     title: "This page doesn't exist.",
-    subline: "The page you're looking for isn't here.",
+    subline: "Let's get you back to the work.",
     cta: "Back home",
   },
 
