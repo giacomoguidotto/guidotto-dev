@@ -1,23 +1,19 @@
 import { Masthead } from "~/components/masthead";
-import { content } from "~/content";
 import styles from "./status.module.css";
 
 // The navigation/Suspense fallback (App Router loading.tsx). The site is largely
-// prerendered, so this rarely shows, but when it does it stays on-brand: the same
-// cool stage and chrome, with a single quiet pulsing mono label instead of a bare
-// white flash.
+// prerendered, so this rarely shows; when it does it is a SILENT hold — the
+// persistent masthead over the same cool stage backdrop, with no label. Both the
+// masthead and the gradient are exactly what the resolved page already paints, so
+// the only thing that changes when it resolves is the page content fading in over
+// an unchanged background: a seamless hand-off, not a "LOADING" flash that vanishes.
 
 export default function Loading() {
-  const { label } = content.loading;
-
   return (
     <main className="page">
       <Masthead />
       <section className={styles.stage}>
         <div aria-hidden="true" className={styles.vignette} />
-        <div className={styles.copy}>
-          <p className={`${styles.code} ${styles.pulse}`}>{label}</p>
-        </div>
       </section>
     </main>
   );

@@ -150,11 +150,6 @@ export interface ErrorContent {
   readonly title: string;
 }
 
-export interface LoadingContent {
-  /** Mono fallback label shown during navigation. */
-  readonly label: string;
-}
-
 export interface HumanContent {
   readonly personalLine: string;
   /** Script signature word (handwritten SVG pending Jack's source picture). */
@@ -185,7 +180,6 @@ export interface Content {
   readonly error: ErrorContent;
   readonly hero: HeroContent;
   readonly human: HumanContent;
-  readonly loading: LoadingContent;
   readonly mission: MissionContent;
   readonly notFound: NotFoundContent;
   readonly projects: readonly Project[];
@@ -367,11 +361,6 @@ export const content: Content = {
     subline: "This one's on me, not you.",
     retry: "Try again",
     cta: "Back home",
-  },
-
-  // The brief navigation/Suspense fallback label.
-  loading: {
-    label: "LOADING",
   },
 
   cta: {

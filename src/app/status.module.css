@@ -192,21 +192,6 @@
   transform: translateX(-0.2rem);
 }
 
-/* ---------- loading: a quiet pulsing label ---------- */
-.pulse {
-  animation: statusPulse 1.6s ease-in-out infinite;
-}
-
-@keyframes statusPulse {
-  0%,
-  100% {
-    opacity: 0.38;
-  }
-  50% {
-    opacity: 0.85;
-  }
-}
-
 /* ---------- short / narrow viewports: shrink the line like the hero ---------- */
 @media (max-width: 640px) {
   .copy {
@@ -221,12 +206,11 @@
   }
 }
 
-/* ---------- reduced motion: freeze the pills, the arrow, the pulse ---------- */
+/* ---------- reduced motion: freeze the pills and the arrow ---------- */
 @media (prefers-reduced-motion: reduce) {
   .home,
   .homeArrow,
-  .retry,
-  .pulse {
+  .retry {
     transition: none;
     animation: none;
   }
