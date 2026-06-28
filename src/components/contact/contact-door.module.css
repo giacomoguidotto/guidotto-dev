@@ -272,23 +272,20 @@
   border-radius: 999px;
   transition:
     transform 0.2s ease,
-    background 0.2s ease,
-    color 0.2s ease;
+    opacity 0.2s ease;
 }
 
 .send:hover {
   transform: translateY(-1px);
 }
 
-/* Disabled — while Turnstile verifies, or while a send is in flight (Send is
-   disabled and so is the Cmd/Ctrl+Enter path it stands in for). The loud ivory
-   accent dims to a muted fill rather than ghosting to translucency, so it reads
-   as a deliberate "not yet / working" pill against the lifted card rather than a
-   half-faded one. */
+/* Disabled — while Turnstile verifies, or while a send is in flight (Send and
+   the Cmd/Ctrl+Enter path it stands in for are both held). The loud ivory accent
+   simply dims back over the card so it reads as a deliberate "not yet / working"
+   pill — dimmed via opacity so the warm accent never shifts hue. */
 .send:disabled {
-  color: color-mix(in oklch, var(--ivory) 72%, transparent);
   cursor: not-allowed;
-  background: color-mix(in oklch, var(--ivory) 34%, var(--stage-1));
+  opacity: 0.45;
   transform: none;
 }
 
