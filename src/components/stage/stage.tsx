@@ -549,8 +549,11 @@ interface MobilePlacement {
 
 const MOBILE_SCATTER: Record<string, MobilePlacement> = {
   anypinn: { depth: 2, x: 0.27, y: 0.05, w: 0.46 },
-  orray: { depth: 1, x: 0.05, y: 0.64, w: 0.45 },
-  tempo: { depth: 3, x: 0.53, y: 0.7, w: 0.42 },
+  // Tempo comes forward (depth 1) and Orray drops a layer behind it (depth 2): on
+  // portrait Orray's near-white logo reads too bright at the front of the depth field,
+  // so it recedes (lower opacity + more blur) and Tempo leads the lower pair instead.
+  orray: { depth: 2, x: 0.05, y: 0.64, w: 0.45 },
+  tempo: { depth: 1, x: 0.53, y: 0.7, w: 0.42 },
 };
 
 // Measure a PORTRAIT peer tile (Orray / Tempo) at its carousel-card home and derive the
