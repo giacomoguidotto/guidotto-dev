@@ -240,11 +240,14 @@ export function ContactDoor() {
   // While the card is open, the document owns two keyboard shortcuts: Escape
   // closes it (restoring focus to the trigger), and Cmd/Ctrl+Enter sends from
   // any field — including the multi-line message, where a bare Enter inserts a
-  // newline rather than submitting. The submit goes through requestSubmit() (not
-  // submit()) so it fires the same submit event and native field validation as
-  // the Send button, and submit() self-guards against a send already in flight
-  // or Turnstile still verifying, so a held shortcut can never double-post.
-  // Click-outside also closes (and resets) the card.
+  // newline rather than submitting. The shortcut validates first: an invalid
+  // field (an empty required box, a malformed email) surfaces the browser's
+  // native prompt via reportValidity() and leaves Send active, so it can never
+  // strand the button in a dimmed "sending" state that no submit will clear. A
+  // valid form goes through requestSubmit() (not submit()) so it fires the same
+  // submit event as the Send button, and submit() self-guards against a send
+  // already in flight or Turnstile still verifying, so a held shortcut can never
+  // double-post. Click-outside also closes (and resets) the card.
   useEffect(() => {
     if (!open) {
       return;
@@ -264,7 +267,15 @@ export function ContactDoor() {
       }
       if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
-        formRef.current?.requestSubmit();
+        const form = formRef.current;
+        if (!form) {
+          return;
+        }
+        if (form.checkValidity()) {
+          form.requestSubmit();
+        } else {
+          form.reportValidity();
+        }
       }
     };
     document.addEventListener("pointerdown", onPointerDown);
@@ -537,6 +548,7 @@ export function ContactDoor() {
                 ) : null}
 
                 <button
+                  aria-busy={status === "sending"}
                   className={`${styles.send} ${styles.reveal}`}
                   disabled={status === "sending" || verifying}
                   style={revealOrder(3)}
