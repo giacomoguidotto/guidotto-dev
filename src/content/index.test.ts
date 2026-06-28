@@ -133,9 +133,9 @@ describe("mission / human / cta", () => {
     expect(content.human.signature).toBe("Jack");
   });
 
-  test("quiet rail keeps unsourced channels dark (never invented)", () => {
+  test("rail exposes the public X profile", () => {
     const x = content.cta.rail.find((link) => link.label === "X");
-    expect(x?.href).toBeNull();
+    expect(x?.href).toBe("https://x.com/giacomoguidotto");
   });
 });
 

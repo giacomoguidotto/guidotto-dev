@@ -26,7 +26,7 @@ export interface SiteContent {
   readonly locale: string;
   /** Person name (JSON-LD, author). */
   readonly name: string;
-  /** Verified external identities for `Person.sameAs` (X omitted until sourced). */
+  /** Verified external identities for `Person.sameAs`. */
   readonly sameAs: readonly string[];
   /** Document `<title>`. */
   readonly title: string;
@@ -144,6 +144,7 @@ export interface Content {
 
 const GITHUB = "https://github.com/giacomoguidotto";
 const LINKEDIN = "https://www.linkedin.com/in/giacomo-guidotto/";
+const X = "https://x.com/giacomoguidotto";
 
 export const content: Content = {
   site: {
@@ -155,7 +156,7 @@ export const content: Content = {
       "Software engineer working across backend platforms, native apps, and ML research. Chasing ideas to make an impact, and shipping them.",
     url: "https://guidotto.dev",
     locale: "en",
-    sameAs: [GITHUB, LINKEDIN],
+    sameAs: [GITHUB, LINKEDIN, X],
   },
 
   hero: {
@@ -280,8 +281,7 @@ export const content: Content = {
     rail: [
       { label: "LinkedIn", href: LINKEDIN },
       { label: "GitHub", href: GITHUB },
-      // No public X handle in the source material yet -> dark until sourced.
-      { label: "X", href: null },
+      { label: "X", href: X },
     ],
   },
 };
