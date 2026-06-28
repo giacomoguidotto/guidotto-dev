@@ -280,6 +280,11 @@
   transform: translateY(-1px);
 }
 
+.send:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--ivory) 70%, transparent);
+  outline-offset: 3px;
+}
+
 /* Disabled — while Turnstile verifies, or while a send is in flight (Send and
    the Cmd/Ctrl+Enter path it stands in for are both held). The loud ivory accent
    dims to a muted fill so it reads as a deliberate "not yet / working" pill.

@@ -57,6 +57,7 @@ interface TurnstileApi {
       readonly "error-callback"?: () => void;
       readonly "expired-callback"?: () => void;
       readonly theme?: "auto" | "dark" | "light";
+      readonly tabindex?: number;
     }
   ) => string;
 }
@@ -362,6 +363,11 @@ export function ContactDoor() {
         sitekey: TURNSTILE_SITE_KEY,
         appearance: "interaction-only",
         theme: "dark",
+        // The widget is invisible in interaction-only mode, so it must not steal
+        // a tab stop between Message and Send. -1 keeps it off the keyboard path;
+        // if Cloudflare ever escalates to a visible challenge it manages focus
+        // itself, and the pointer path still reaches it.
+        tabindex: -1,
         callback: (value: string) => setToken(value),
         "expired-callback": () => setToken(""),
         "error-callback": () => setToken(""),
