@@ -509,6 +509,7 @@ export function ContactDoor() {
   return (
     <div className={styles.stage}>
       <section className={styles.contact} id="contact">
+        <p className={styles.lead}>{cta.lead}</p>
         <details
           className={canMorph ? `${styles.door} ${styles.morph}` : styles.door}
           onToggle={handleToggle}

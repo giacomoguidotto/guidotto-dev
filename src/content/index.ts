@@ -171,6 +171,7 @@ export interface CtaContent {
     readonly email: string;
     readonly message: string;
   };
+  readonly lead: string;
   readonly rail: readonly RailLink[];
   readonly send: string;
 }
@@ -364,6 +365,7 @@ export const content: Content = {
   },
 
   cta: {
+    lead: "Got a hard problem? I want it.",
     button: "Get in touch",
     fields: {
       name: "Name",

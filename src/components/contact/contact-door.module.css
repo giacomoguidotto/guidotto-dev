@@ -37,7 +37,7 @@
   color: var(--ivory);
   background:
     radial-gradient(
-      60% 48% at 50% 66%,
+      60% 48% at 50% 58%,
       color-mix(in oklch, oklch(0.4 0.085 256) 58%, transparent) 0%,
       color-mix(in oklch, oklch(0.4 0.085 256) 22%, transparent) 40%,
       transparent 74%
@@ -53,6 +53,27 @@
   max-width: 32rem;
   margin: 0 auto;
   text-align: center;
+}
+
+/* the lead — Jack's voice carried into the ask, so the loud door is never alone
+   on the dark floor. Serif, warm, a touch oversized; it steps back (fades, lifts)
+   once the door opens so the form, not the invitation, is the subject. */
+.lead {
+  margin: 0 0 1.4rem;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.5rem, 4vw, 2.1rem);
+  line-height: 1.1;
+  color: var(--ivory);
+  letter-spacing: -0.01em;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.contact:has(.door[open]) .lead {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 /* ---------- the door: pill when closed, raised card when open ---------- */
@@ -144,7 +165,7 @@
   gap: 0.6rem;
   align-items: center;
   justify-content: center;
-  padding: 0.8rem 1.5rem;
+  padding: 0.95rem 1.9rem;
   font-family: var(--font-mono), monospace;
   font-size: 0.82rem;
   color: var(--ivory);
@@ -232,9 +253,12 @@
 }
 
 /* the travelling label — same node in both states, so the View Transition
-   slides it from the pill's centre to the card's top-left, where it cross-fades
-   from the small mono CTA into the card's serif title. */
+   slides it from the pill's centre to the card's top-left, where it grows from
+   the closed serif CTA into the card's full title. */
 .label {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
