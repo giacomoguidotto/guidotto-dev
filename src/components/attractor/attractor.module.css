@@ -364,7 +364,6 @@
   top: 50%;
   left: calc(var(--progress, 0) * 100%);
   z-index: 1;
-  display: none;
   width: 0.85rem;
   height: 0.85rem;
   pointer-events: none;
@@ -373,7 +372,15 @@
   box-shadow:
     0 0 10px color-mix(in oklch, var(--accent) 65%, transparent),
     0 1px 3px oklch(0 0 0 / 0.55);
+  opacity: 0;
+  /* hidden at rest, scaled to nothing; hover/touch grows it in (and out) with a
+     gentle overshoot. translate keeps it centred on the fill edge; scale rides
+     the transition. */
+  scale: 0;
   translate: -50% -50%;
+  transition:
+    scale 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.18s ease;
 }
 
 /* ---------- touch: a real control (visible thumb + a fat tap band) ---------- */
@@ -388,7 +395,8 @@
    enters this block, so its bare invisible-range-over-a-2px-bar is untouched. */
 @media (pointer: coarse) {
   .scrubberThumb {
-    display: block;
+    opacity: 1;
+    scale: 1;
   }
 
   .scrubberInput {
@@ -396,6 +404,17 @@
     height: 44px;
     touch-action: pan-y;
     transform: translateY(-50%);
+  }
+}
+
+/* Hover-capable pointers (desktop) grow the thumb in on hover/focus so the bare
+   2px bar reads as a draggable control — at rest it stays bare, on hover the
+   thumb scales up to signal "you can scrub here". Touch always shows it above. */
+@media (hover: hover) {
+  .scrubber:hover .scrubberThumb,
+  .scrubber:focus-within .scrubberThumb {
+    opacity: 1;
+    scale: 1;
   }
 }
 
