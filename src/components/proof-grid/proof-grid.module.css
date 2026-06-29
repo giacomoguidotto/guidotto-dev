@@ -49,7 +49,7 @@
     color-mix(in oklch, var(--live-accent, transparent) 26%, transparent) 0%,
     transparent 58%
   );
-  transition: background 0.7s ease;
+  transition: --live-accent 0.7s ease;
 }
 
 .section {

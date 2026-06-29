@@ -107,7 +107,7 @@
     color-mix(in oklch, var(--live-accent, transparent) 28%, transparent) 0%,
     transparent 58%
   );
-  transition: background 0.7s ease;
+  transition: --live-accent 0.7s ease;
 }
 
 /* film grain over the field; it belongs to the contact sheet and fades out as the

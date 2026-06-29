@@ -121,6 +121,10 @@ body {
     var(--stage-3) 100%
   );
   isolation: isolate;
+  /* Cross-fade the earned accent itself: it is registered (<color>), so swapping
+     it vessel-to-vessel interpolates instead of snapping (color-mix inside the
+     tint's background can't be transitioned, but the variable can). */
+  transition: --live-accent 0.7s ease;
 }
 
 /* The field tint rides the focused project's accent (earned color). It is a
@@ -141,7 +145,7 @@ body {
   opacity: 0;
   transition:
     opacity 0.7s ease,
-    background 0.4s ease;
+    background 0.7s ease;
 }
 
 /* One vessel is loud at a time, so the wash rises toward exactly one accent.
@@ -680,6 +684,15 @@ body {
    cursor and eases home on leave — an unregistered custom property would jump.
    The defaults are the rest origin the highlight returns to when no pointer is
    tracking (touch, the open card, reduced motion, or pointer-left). */
+/* The earned bloom color, registered so a transition can interpolate it: a bare
+   custom property is non-animatable, so swapping it would snap the wash instead
+   of fading it. Inherited (the reactivity root writes it; the tints read it). */
+@property --live-accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+
 @property --door-mx {
   syntax: "<percentage>";
   inherits: false;
