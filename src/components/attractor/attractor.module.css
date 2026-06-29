@@ -441,9 +441,15 @@
   width: 100%;
   aspect-ratio: 1;
   overflow: hidden;
+  cursor: pointer;
   background: color-mix(in oklch, var(--accent) 12%, var(--stage-2));
   border-radius: 1.1rem;
-  box-shadow: 0 18px 40px -22px oklch(0 0 0 / 0.85);
+  /* resting affordance: a faint accent ring + cast so the vessel reads as a raised,
+     tappable control even at rest — on touch (no :hover) this is the only signal */
+  box-shadow:
+    0 18px 40px -22px oklch(0 0 0 / 0.85),
+    0 16px 40px -16px color-mix(in oklch, var(--accent) 45%, transparent),
+    0 0 0 1px color-mix(in oklch, var(--accent) 28%, transparent);
   /* gentle lift when lit; no float, no parallax at rest (matches the proof cards) */
   transform: translate3d(0, 0, 0) scale(1);
   transition:
@@ -468,6 +474,7 @@
   inset: 0;
   z-index: 1;
   pointer-events: none;
+  border-color: color-mix(in oklch, var(--accent) 32%, transparent);
   transition:
     border-color 0.5s ease,
     box-shadow 0.5s ease;
@@ -502,6 +509,19 @@
   text-transform: uppercase;
   letter-spacing: 0.2em;
   white-space: nowrap;
+}
+
+/* the external-link cue: a resting "↗" that says this tile opens the repo, even
+   without hover. Nudges out on hover/focus of the vessel as a small confirmation. */
+.landingTagArrow {
+  display: inline-block;
+  margin-left: 0.55em;
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.vessel:hover ~ .landingTag .landingTagArrow,
+.vessel:focus-visible ~ .landingTag .landingTagArrow {
+  transform: translate(0.12em, -0.12em);
 }
 
 /* ---------- the badge (top-right, always present across tiers) ---------- */

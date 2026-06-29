@@ -80,7 +80,12 @@ export function Attractor() {
             <ProjectMedia motif={showpiece.motif} />
             <span className={`${styles.vesselGlass} glass-frame`} />
           </a>
-          <span className={styles.landingTag}>{showpiece.label}</span>
+          <span className={styles.landingTag}>
+            {showpiece.label}
+            <span aria-hidden className={styles.landingTagArrow}>
+              ↗
+            </span>
+          </span>
         </div>
 
         <LiveInstrument />
