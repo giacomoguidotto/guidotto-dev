@@ -1501,6 +1501,21 @@ function MobileMotionStage() {
       lastProgress = -1;
       compute();
     };
+    // A resize whose WIDTH is unchanged is a mobile chrome change — the URL bar
+    // collapsing or the soft keyboard opening (the contact form, near the page foot)
+    // — not a layout change. Remeasuring on it re-pads centerFirstCard against the
+    // new vh while we are scrolled well below the pin, recentring the whole carousel
+    // and stranding the showpiece mid-deck until the next handoff overrides it. So
+    // only remeasure on a width/orientation change; compute() already maps progress
+    // against the captured morphTravel, so the height shift needs no re-measure.
+    let lastVW = window.innerWidth;
+    const onResize = () => {
+      if (window.innerWidth === lastVW) {
+        return;
+      }
+      lastVW = window.innerWidth;
+      remeasure();
+    };
 
     measure();
     compute();
@@ -1512,7 +1527,7 @@ function MobileMotionStage() {
     );
 
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", remeasure);
+    window.addEventListener("resize", onResize);
     // Enable the handoff's proximity scroll-snap (Part B / #27). The document is the
     // scroller, so the snap type lives on the root element; it is scoped to this stage's
     // lifetime and is `proximity` — never `mandatory` — so it only assists a half-finished
@@ -1566,7 +1581,7 @@ function MobileMotionStage() {
 
     return () => {
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", remeasure);
+      window.removeEventListener("resize", onResize);
       stage.removeEventListener("pointerover", onOver);
       stage.removeEventListener("pointerleave", onLeave);
       stage.removeEventListener("focusin", onFocusIn);
@@ -1979,6 +1994,18 @@ function MotionStage() {
         requestAnimationFrame(() => stage.classList.add(styles.ready));
       }
     };
+    // Skip width-unchanged resizes: on touch laptops/tablets these are mobile chrome
+    // changes (URL bar, soft keyboard) firing while scrolled below the pin, where the
+    // live pinRect is off-screen, not real layout changes. Remeasure only on a
+    // width/orientation change; the ResizeObserver still catches grid reflows.
+    let lastVW = window.innerWidth;
+    const onResize = () => {
+      if (window.innerWidth === lastVW) {
+        return;
+      }
+      lastVW = window.innerWidth;
+      remeasure();
+    };
 
     measure();
     compute();
@@ -1990,7 +2017,7 @@ function MotionStage() {
     );
 
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", remeasure);
+    window.addEventListener("resize", onResize);
     // Enable the handoff's proximity scroll-snap (Part B). The document is the
     // scroller, so the snap type lives on the root element; it is scoped to the motion
     // stage's lifetime (restored on cleanup) and is `proximity` — not `mandatory` — so
@@ -2031,7 +2058,7 @@ function MotionStage() {
 
     return () => {
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", remeasure);
+      window.removeEventListener("resize", onResize);
       stage.removeEventListener("pointerover", onOver);
       stage.removeEventListener("pointerleave", onLeave);
       stage.removeEventListener("focusin", onFocusIn);
